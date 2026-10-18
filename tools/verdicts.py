@@ -52,8 +52,8 @@ WEBBOX_ROOT = os.path.realpath(os.environ.get("WEBBOX_ROOT", os.path.join(ROOT, 
 WEBBOX_SRC = os.path.join(WEBBOX_ROOT, "src")
 WEBBOX_BUILT = ("src", "build.zig", "build.zig.zon")
 # Shale's checkout (shale), compiled into both applications as webbox is.
-SHALE_ROOT = os.path.realpath(os.environ.get("SHALE_ROOT", os.path.join(ROOT, "..", "shale")))
-SHALE_SRC = os.path.join(SHALE_ROOT, "src")
+SHALE_CHECKOUT = os.path.realpath(os.environ.get("SHALE_CHECKOUT", os.path.join(ROOT, "..", "shale")))
+SHALE_SRC = os.path.join(SHALE_CHECKOUT, "src")
 SHALE_BUILT = WEBBOX_BUILT
 VERDICT_DIR = os.environ.get("GATES_VERDICT_DIR", os.path.expanduser("~/build/zig-metal-unikernel/verdicts"))
 SDK = os.environ.get("COVERAGE_SDK", os.path.join(os.path.dirname(ROOT), "zig-coverage-sdk"))
@@ -135,7 +135,7 @@ def content_id() -> str:
     h = hashlib.sha256()
     for repo, root, rels in (("angry-gopher", GOPHER_ROOT, served_files()),
                              ("zig-webbox", WEBBOX_ROOT, sorted(walk(WEBBOX_ROOT, WEBBOX_BUILT))),
-                             ("shale", SHALE_ROOT, sorted(walk(SHALE_ROOT, SHALE_BUILT)))):
+                             ("shale", SHALE_CHECKOUT, sorted(walk(SHALE_CHECKOUT, SHALE_BUILT)))):
         for rel in rels:
             h.update(f"{repo}/{rel}".encode() + b"\0")
             try:
@@ -235,7 +235,7 @@ def require() -> list:
         why.append("angry-gopher's served files have uncommitted changes")
     if git(WEBBOX_ROOT, "status", "--porcelain", "--untracked-files=no", "--", *WEBBOX_BUILT):
         why.append("zig-webbox has uncommitted changes")
-    if git(SHALE_ROOT, "status", "--porcelain", "--untracked-files=no", "--", *SHALE_BUILT):
+    if git(SHALE_CHECKOUT, "status", "--porcelain", "--untracked-files=no", "--", *SHALE_BUILT):
         why.append("shale has uncommitted changes")
     for tier in TIERS:
         try:
@@ -276,7 +276,7 @@ def freshness() -> str:
     if not os.path.isdir(WEBBOX_SRC):
         return f"no zig-webbox sources at {WEBBOX_SRC} (WEBBOX_ROOT)"
     if not os.path.isdir(SHALE_SRC):
-        return f"no shale sources at {SHALE_SRC} (SHALE_ROOT)"
+        return f"no shale sources at {SHALE_SRC} (SHALE_CHECKOUT)"
     escaped = []
     # Every folder down: Shale's interpreter is in shale's src/script/.
     for src in (SRC, WEBBOX_SRC, SHALE_SRC):

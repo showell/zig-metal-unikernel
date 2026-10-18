@@ -3230,13 +3230,13 @@ class Laps:
 
 
 # **ONE webbox, AND ONE shale, ON BOTH SIDES.** The kernel takes each from
-# -Dwebbox-root and -Dshale-root (WEBBOX_ROOT, SHALE_ROOT, whose defaults
+# -Dwebbox-root and -Dshale-root (WEBBOX_ROOT, SHALE_CHECKOUT, whose defaults
 # are build.zig's: ../zig-webbox, ../shale), the Linux zig-server from its
 # build.zig.zon's dependency paths: the judge refuses to compare two hosts
 # built on two different libraries.
 _HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 WEBBOX_ROOT = os.path.realpath(os.environ.get("WEBBOX_ROOT", os.path.join(_HERE, "..", "zig-webbox")))
-SHALE_ROOT = os.path.realpath(os.environ.get("SHALE_ROOT", os.path.join(_HERE, "..", "shale")))
+SHALE_CHECKOUT = os.path.realpath(os.environ.get("SHALE_CHECKOUT", os.path.join(_HERE, "..", "shale")))
 
 
 def two_libraries(gopher_root: str, name: str, root: str):
@@ -3266,7 +3266,7 @@ def main() -> int:
         print(__doc__.strip())
         return 2
     elf, linux_bin, gopher_root, work = sys.argv[1:]
-    refusal = two_webboxes(gopher_root, WEBBOX_ROOT) or two_libraries(gopher_root, "shale", SHALE_ROOT)
+    refusal = two_webboxes(gopher_root, WEBBOX_ROOT) or two_libraries(gopher_root, "shale", SHALE_CHECKOUT)
     if refusal:
         print(refusal)
         return 1

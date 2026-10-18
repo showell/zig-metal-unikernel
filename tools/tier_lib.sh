@@ -14,17 +14,19 @@ t=$SECONDS
 lap() { echo "time: $1 $((SECONDS - t)) s"; t=$SECONDS; }
 
 # **THE SIBLINGS ARE BESIDE THIS CHECKOUT** unless named (GOPHER_ROOT,
-# WEBBOX_ROOT, SHALE_ROOT, METAL_VMM): ../<name>, as build.zig's own
+# WEBBOX_ROOT, SHALE_CHECKOUT, METAL_VMM): ../<name>, as build.zig's own
 # defaults and every script's (README, "What you need"): on the box that is
 # ~/showell_repos/<name>, and in check-cc.sh's
 # worktrees is the worktree's sibling. Only tiers 2 and 3 read them.
 sibling() { (cd "$HERE/../$1" 2>/dev/null && pwd) || echo "$HERE/../$1"; }
 GOPHER_ROOT="${GOPHER_ROOT:-$(sibling angry-gopher)}"
 WEBBOX_ROOT="${WEBBOX_ROOT:-$(sibling zig-webbox)}"
-SHALE_ROOT="${SHALE_ROOT:-$(sibling shale)}"
+# Not SHALE_ROOT: that is the `shale` CLI's own, its data root, which every
+# shale run under a tier would then take (tier 3's doc check found no repos).
+SHALE_CHECKOUT="${SHALE_CHECKOUT:-$(sibling shale)}"
 VMM="${METAL_VMM:-$(sibling metal-vmm)}"
-export GOPHER_ROOT WEBBOX_ROOT SHALE_ROOT
-ZIG_SIBLINGS=(-Dgopher-root="$GOPHER_ROOT" -Dwebbox-root="$WEBBOX_ROOT" -Dshale-root="$SHALE_ROOT")
+export GOPHER_ROOT WEBBOX_ROOT SHALE_CHECKOUT
+ZIG_SIBLINGS=(-Dgopher-root="$GOPHER_ROOT" -Dwebbox-root="$WEBBOX_ROOT" -Dshale-root="$SHALE_CHECKOUT")
 # Kept results, as gates.sh always kept them.
 VERDICTS="${GATES_VERDICTS:-$HOME/build/zig-metal-unikernel/gates}"
 mkdir -p "$VERDICTS"

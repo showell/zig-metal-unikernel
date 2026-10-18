@@ -6,7 +6,7 @@
 # built and judged against its Linux build on two machines; the site
 # volume, and metal-vmm on gopher.elf (the PC-shaped machine's rests, the
 # timeouts). Needs angry-gopher, zig-webbox and shale beside this checkout
-# (or GOPHER_ROOT, WEBBOX_ROOT, SHALE_ROOT), and tier 2's metal-vmm and KVM. Dog Park is not
+# (or GOPHER_ROOT, WEBBOX_ROOT, SHALE_CHECKOUT), and tier 2's metal-vmm and KVM. Dog Park is not
 # judged here (Steve, 2026-10-13): an application is not this repo's test of
 # itself.
 #
@@ -44,7 +44,7 @@ fi
 
 # **THE DOCS' CITED PATHS AND NAMES**, this repo's (shale's
 # tools/doc_check.shale, a few seconds): before the minutes.
-(cd "$SHALE_ROOT" && zig build doc-check -- only=zig-metal-unikernel) > "$VERDICTS/tier3-docs.txt" 2>&1 \
+(cd "$SHALE_CHECKOUT" && zig build doc-check -- only=zig-metal-unikernel) > "$VERDICTS/tier3-docs.txt" 2>&1 \
     || { failed+=(docs); grep -E "gone |ambiguous |names gone |findings" "$VERDICTS/tier3-docs.txt" | head -9; }
 lap "the docs' cited paths and names"
 
@@ -81,7 +81,7 @@ if ! skip webbox-test; then
 fi
 # Shale's own tests, on its Linux host.
 if ! skip shale-test; then
-    (cd "$SHALE_ROOT" && zig build test 2>&1 | tail -5; exit "${PIPESTATUS[0]}") || failed+=(shale-test)
+    (cd "$SHALE_CHECKOUT" && zig build test 2>&1 | tail -5; exit "${PIPESTATUS[0]}") || failed+=(shale-test)
 fi
 lap "limits, pinned, check-apps, zig-webbox's and shale's tests"
 
