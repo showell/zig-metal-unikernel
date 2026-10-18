@@ -83,7 +83,7 @@ before any byte of a response or of a kept stream's frame goes out. A failed
 flush is logged and counted, the response still goes, and the next one
 tries again.
 
-- **Metal:** `io.durable` (`src/io.zig`), called from `Stream.sendAll`
+- **Metal:** `io.durable` (`src/io_volumes.zig`, re-exported by `src/io.zig`), called from `Stream.sendAll`
   (`src/stream.zig`), flushes each disk that has writes it may not have
   kept. Failed flushes are counted per disk and shown on `/admin/host`.
 - **Linux:** the store counts every call that may have changed the disk

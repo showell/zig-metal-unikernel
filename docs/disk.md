@@ -2,7 +2,7 @@
 
 How `src/disk_fat.zig` (FAT16 and FAT32 alike) came to be ours, and what each
 part is judged by. FAT32 itself is [`FAT32.md`](../FAT32.md); the caches above
-the filesystem are `src/page_cache.zig` and `src/io.zig`'s `SiteCache`.
+the filesystem are `src/page_cache.zig` and `src/io_volumes.zig`'s `SiteCache`.
 
 ## Why we wrote our own
 

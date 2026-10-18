@@ -89,7 +89,7 @@ FAT's, so a laptop refuses what the droplet would (Steve, 2026-10-02):
   `max_name`), printable ASCII, none of `" * / : < > ? \ |`, not `.` or
   `..`, not ending in a dot or a space.
 - **Case does not tell two names apart; it is kept for display.**
-- **A path at most 256 bytes** (`io.zig`'s `max_path`) **and 16 parts deep**
+- **A path at most 256 bytes** (`io_volumes.zig`'s `max_path`) **and 16 parts deep**
   from its root's own name, so a file sits in at most 15 folders
   (`fat16`'s `max_path_depth`). `tools/check_limits.py`, in `gates.sh`,
   fails if angry-gopher's copies of these three move apart from metal's.

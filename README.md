@@ -385,7 +385,7 @@ To find it:
 
 | where | what |
 |---|---|
-| `src/` | the kernel: boot, drivers, network, FAT, the `Io` the application calls (`io.zig`), the simulators (`*_sim.zig`) and `properties.zig` |
+| `src/` | the kernel: boot, drivers, network, FAT, the `Io` the application calls (`io.zig`; where a path's bytes are, `io_volumes.zig`), the simulators (`*_sim.zig`) and `properties.zig` |
 | `src/host_io_metal.zig` | the one file that hands the application this kernel's `Io` |
 | `probe/gopher.zig` | the kernel around an application: one loop (`kmain`) and one connection served (`serveOne`); beside it, `probe/config.zig` (the volume's config file), `probe/volumes.zig` (the disks found, mounted and checked), `probe/host_facts.zig` (`/admin/host`'s kernel half) and `probe/stream_turn.zig` (the live streams' turn between requests) |
 | `probe/*.zig` | small test kernels, one subsystem each |

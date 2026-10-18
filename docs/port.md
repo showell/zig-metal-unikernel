@@ -293,7 +293,7 @@ interrupts and the idle halt):
 Pages that need no file were within about 0.1 ms of Linux, at the median and
 in the slow tenth. Pages read from files were about 1 ms slower. That run
 predates the page cache (`src/page_cache.zig`) and the site cache
-(`io.zig`'s `SiteCache`), which keep files in memory after their first read;
+(`io_volumes.zig`'s `SiteCache`), which keep files in memory after their first read;
 it has not been repeated since, so whether the gap remains is not measured.
 One run, on one evening: DigitalOcean's neighbours vary.
 
