@@ -169,10 +169,17 @@ pub fn build(b: *std.Build) void {
     // (the application's own option, as its ops/deploy sets it on Linux) and
     // this repository's, each marked `+dirty` when its tree had uncommitted
     // changes, so a page never names a commit the machine is not running.
+    // **-Dstamp=off STAMPS NEITHER** (Steve, 2026-10-18): both commits read
+    // `unstamped`, so two builds of the same code are the same bytes
+    // whatever the commits or the trees' state. For comparing executables
+    // (a refactor judged, a build reproduced); a stamp of a different length
+    // (`+dirty`) moved what followed it. Never deployed: /version would say
+    // `unstamped`. dog-park's build passes its own `-Dstamp` here.
+    const stamp = b.option(Stamp, "stamp", "on (the default): the commits baked in, for /version; off: `unstamped`, so two builds of the same code are byte-identical") orelse .on;
     const build_opts = b.addOptions();
-    build_opts.addOption([]const u8, "commit", commitOf(b, gopher_root));
+    build_opts.addOption([]const u8, "commit", stampOf(b, stamp, gopher_root));
     const gm_opts = b.addOptions();
-    gm_opts.addOption([]const u8, "commit", commitOf(b, b.pathFromRoot(".")));
+    gm_opts.addOption([]const u8, "commit", stampOf(b, stamp, b.pathFromRoot(".")));
     // **ON BY DEFAULT** (RESTART.md): a guest's reset restarts a real
     // droplet, measured 2026-10-03; -Drestart=false halts instead.
     gm_opts.addOption(bool, "restart", b.option(bool, "restart", "gopher.elf restarts on a failure while serving (RESTART.md; measured on a real droplet 2026-10-03); -Drestart=false halts instead") orelse true);
@@ -931,6 +938,17 @@ fn servedBy(b: *std.Build, path: []const u8) Served {
     const z = b.allocator.dupeZ(u8, text) catch @panic("out of memory");
     return std.zon.parse.fromSliceAlloc(Served, b.allocator, z, null, .{}) catch
         std.process.fatal("{s} does not read as an application's assets (.embedded and .site)", .{path});
+}
+
+/// Whether a build bakes its commits in (`-Dstamp`).
+pub const Stamp = enum { on, off };
+
+/// The commit a build says it is: `dir`'s, or `unstamped` (`-Dstamp=off`).
+fn stampOf(b: *std.Build, stamp: Stamp, dir: []const u8) []const u8 {
+    return switch (stamp) {
+        .on => commitOf(b, dir),
+        .off => "unstamped",
+    };
 }
 
 /// `git rev-parse --short HEAD` in `dir`, with `+dirty` when its tree has
