@@ -487,7 +487,7 @@ pub fn protoSeed(seed: u64) Failure!void {
     const dst_ip = [4]u8{ 10, 0, 2, 15 };
     const sport = r.int(u16);
     const dport = r.int(u16);
-    var len = proto.writeUdp(&frame, src_mac, .{ 2, 0, 0, 0, 0, 1 }, src_ip, dst_ip, sport, dport, payload_len);
+    var len = proto.writeUdp(&frame, .{ .mac = src_mac, .ip = src_ip }, .{ .mac = .{ 2, 0, 0, 0, 0, 1 }, .ip = dst_ip }, .{ .src = sport, .dst = dport }, payload_len);
     // Ethernet pads a short frame: a few bytes past the datagram are fine.
     const pad = r.uintLessThan(usize, 8);
     @memset(frame[len..][0..pad], 0);

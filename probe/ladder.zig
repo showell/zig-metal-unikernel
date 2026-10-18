@@ -179,7 +179,7 @@ fn udpEcho(link: *Link, k: usize) void {
     const payload = frame[proto.udp_payload_at..][0..64];
     @memset(payload, 'u');
     std.mem.writeInt(u64, payload[0..8], k, .little);
-    const len = proto.writeUdp(&frame, link.nic.mac, link.host_mac, link.ip, link.host_ip, echo_from, link.echo_port, payload.len);
+    const len = proto.writeUdp(&frame, .{ .mac = link.nic.mac, .ip = link.ip }, .{ .mac = link.host_mac, .ip = link.host_ip }, .{ .src = echo_from, .dst = link.echo_port }, payload.len);
     link.nic.send(frame[0..len]);
     var back: [net.buffer_size]u8 = undefined;
     const sent_at = now();

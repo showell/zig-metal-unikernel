@@ -96,22 +96,20 @@ pub fn writeEth(out: []u8, dst: [6]u8, src: [6]u8, ethertype: u16) void {
     @memcpy(out[12..14], &be16(ethertype));
 }
 
+/// One end of an IPv4 frame: its ethernet address and its IP address.
+pub const Host = struct { mac: [6]u8, ip: [4]u8 };
+
+/// A UDP datagram's ports, the sender's and the receiver's.
+pub const Ports = struct { src: u16, dst: u16 };
+
 /// An ethernet header and an IPv4 header into `out`, for a payload of
 /// `payload_len` already in place at `eth_header_len + ip_header_len`.
 /// Answers the total frame length.
 ///
 /// The IPv4 header checksum is not optional and is computed here; what the
 /// payload's own checksum should be is the caller's business.
-pub fn writeIpv4(
-    out: []u8,
-    src_mac: [6]u8,
-    dst_mac: [6]u8,
-    src_ip: [4]u8,
-    dst_ip: [4]u8,
-    protocol: u8,
-    payload_len: usize,
-) usize {
-    writeEth(out, dst_mac, src_mac, ethertype_ipv4);
+pub fn writeIpv4(out: []u8, from: Host, to: Host, protocol: u8, payload_len: usize) usize {
+    writeEth(out, to.mac, from.mac, ethertype_ipv4);
 
     const ip = out[eth_header_len..][0..ip_header_len];
     const total = ip_header_len + payload_len;
@@ -123,8 +121,8 @@ pub fn writeIpv4(
     ip[8] = 64; // time to live
     ip[9] = protocol;
     @memcpy(ip[10..12], &be16(0)); // the checksum, over a zeroed checksum
-    @memcpy(ip[12..16], &src_ip);
-    @memcpy(ip[16..20], &dst_ip);
+    @memcpy(ip[12..16], &from.ip);
+    @memcpy(ip[16..20], &to.ip);
     @memcpy(ip[10..12], &be16(checksum(ip)));
 
     return eth_header_len + total;
@@ -135,21 +133,12 @@ pub fn writeIpv4(
 ///
 /// The UDP checksum is left at zero, which IPv4 permits and every stack
 /// accepts.
-pub fn writeUdp(
-    out: []u8,
-    src_mac: [6]u8,
-    dst_mac: [6]u8,
-    src_ip: [4]u8,
-    dst_ip: [4]u8,
-    src_port: u16,
-    dst_port: u16,
-    payload_len: usize,
-) usize {
-    const frame_len = writeIpv4(out, src_mac, dst_mac, src_ip, dst_ip, proto_udp, udp_header_len + payload_len);
+pub fn writeUdp(out: []u8, from: Host, to: Host, ports: Ports, payload_len: usize) usize {
+    const frame_len = writeIpv4(out, from, to, proto_udp, udp_header_len + payload_len);
 
     const udp = out[eth_header_len + ip_header_len ..][0..udp_header_len];
-    @memcpy(udp[0..2], &be16(src_port));
-    @memcpy(udp[2..4], &be16(dst_port));
+    @memcpy(udp[0..2], &be16(ports.src));
+    @memcpy(udp[2..4], &be16(ports.dst));
     @memcpy(udp[4..6], &be16(@intCast(udp_header_len + payload_len)));
     @memcpy(udp[6..8], &be16(0)); // no checksum, which IPv4 allows
 

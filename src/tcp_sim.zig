@@ -222,7 +222,7 @@ const Client = struct {
         var buf: [1600]u8 = undefined;
         const options: []const u8 = if (flags & tcp.flag_syn != 0) &[_]u8{ 2, 4, client_mss >> 8, client_mss & 0xFF } else &.{};
         const len = tcp.header_len + options.len;
-        const frame_len = proto.writeIpv4(&buf, client_mac, server_mac, client_ip, server_ip, proto.proto_tcp, len + data.len);
+        const frame_len = proto.writeIpv4(&buf, .{ .mac = client_mac, .ip = client_ip }, .{ .mac = server_mac, .ip = server_ip }, proto.proto_tcp, len + data.len);
         const t = buf[tcp.segment_at..][0 .. len + data.len];
         const wnd = self.window();
         @memcpy(t[0..2], &proto.be16(self.port));
@@ -1150,7 +1150,7 @@ const Sim = struct {
         var buf: [1600]u8 = undefined;
         const ip = [4]u8{ 10, 0, 3, 10 + k };
         const len = tcp.header_len;
-        const frame_len = proto.writeIpv4(&buf, client_mac, server_mac, ip, server_ip, proto.proto_tcp, len);
+        const frame_len = proto.writeIpv4(&buf, .{ .mac = client_mac, .ip = ip }, .{ .mac = server_mac, .ip = server_ip }, proto.proto_tcp, len);
         const t = buf[tcp.segment_at..][0..len];
         @memcpy(t[0..2], &proto.be16(50_000 + @as(u16, k)));
         @memcpy(t[2..4], &proto.be16(80));

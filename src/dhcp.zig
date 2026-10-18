@@ -232,17 +232,8 @@ pub fn acquire(nic: *net.Net, frame: []u8, reply: []u8) Error!Lease {
     // the last one on this wire, and it used to be a constant in the caller.
     const xid = rng.int(u32);
 
-    // DISCOVER
-    var at = writeBootp(frame[proto.udp_payload_at..], xid, nic.mac);
-    const p = frame[proto.udp_payload_at..];
-    at = option(p, at, opt_message_type, &.{msg_discover});
-    at = option(p, at, opt_param_list, &.{ opt_subnet_mask, opt_router, opt_dns });
-    p[at] = opt_end;
-    at += 1;
-
-    var len = proto.writeUdp(frame, nic.mac, proto.mac_broadcast, proto.ip_any, proto.ip_broadcast, port_client, port_server, at);
     var from_mac: [6]u8 = undefined;
-    const offer_len = (try exchange(nic, frame, len, xid, msg_offer, reply, &from_mac)) orelse return Error.NoOffer;
+    const offer_len = (try exchange(nic, frame, discover(frame, xid, nic.mac), xid, msg_offer, reply, &from_mac)) orelse return Error.NoOffer;
     const offer = reply[0..offer_len];
 
     var lease = Lease{
@@ -253,21 +244,61 @@ pub fn acquire(nic: *net.Net, frame: []u8, reply: []u8) Error!Lease {
         .server = ipOption(offer, opt_server_id),
     };
 
-    // REQUEST: name the address offered and the server that offered it, so a
-    // second server on the wire knows its own offer was declined.
-    at = writeBootp(p, xid, nic.mac);
-    at = option(p, at, opt_message_type, &.{msg_request});
-    at = option(p, at, opt_requested_ip, &lease.address);
-    at = option(p, at, opt_server_id, &lease.server);
-    p[at] = opt_end;
-    at += 1;
-
-    len = proto.writeUdp(frame, nic.mac, proto.mac_broadcast, proto.ip_any, proto.ip_broadcast, port_client, port_server, at);
-    const ack_len = (try exchange(nic, frame, len, xid, msg_ack, reply, &from_mac)) orelse return Error.NoAck;
+    const ack_len = (try exchange(nic, frame, request(frame, xid, nic.mac, lease.address, lease.server), xid, msg_ack, reply, &from_mac)) orelse return Error.NoAck;
     takeAck(&lease, reply[0..ack_len]);
     lease.server_mac = from_mac;
 
     return lease;
+}
+
+/// A DISCOVER for transaction `xid` from `mac`, into `frame`: its length.
+fn discover(frame: []u8, xid: u32, mac: [6]u8) usize {
+    const p = frame[proto.udp_payload_at..];
+    var at = writeBootp(p, xid, mac);
+    at = option(p, at, opt_message_type, &.{msg_discover});
+    at = option(p, at, opt_param_list, &.{ opt_subnet_mask, opt_router, opt_dns });
+    p[at] = opt_end;
+    return fromClient(frame, mac, at + 1);
+}
+
+/// A REQUEST, into `frame`: it names the address offered and the server
+/// that offered it, so a second server on the wire knows its own offer was
+/// declined. Its length.
+fn request(frame: []u8, xid: u32, mac: [6]u8, address: [4]u8, server: [4]u8) usize {
+    const p = frame[proto.udp_payload_at..];
+    var at = writeBootp(p, xid, mac);
+    at = option(p, at, opt_message_type, &.{msg_request});
+    at = option(p, at, opt_requested_ip, &address);
+    at = option(p, at, opt_server_id, &server);
+    p[at] = opt_end;
+    return fromClient(frame, mac, at + 1);
+}
+
+/// A client's message, its payload in place: broadcast, from no address
+/// (it has none yet), the client's port to the server's.
+fn fromClient(frame: []u8, mac: [6]u8, payload_len: usize) usize {
+    return proto.writeUdp(frame, .{ .mac = mac, .ip = proto.ip_any }, .{ .mac = proto.mac_broadcast, .ip = proto.ip_broadcast }, .{ .src = port_client, .dst = port_server }, payload_len);
+}
+
+test "a DISCOVER and a REQUEST go broadcast, from no address, the client's port to the server's, saying what they are" {
+    const std = @import("std");
+    const mac = [6]u8{ 2, 0, 0, 0, 0, 7 };
+    var frame: [600]u8 = undefined;
+    for ([_]u8{ msg_discover, msg_request }) |t| {
+        const len = if (t == msg_discover) discover(&frame, 7, mac) else request(&frame, 7, mac, .{ 10, 0, 2, 15 }, .{ 10, 0, 2, 2 });
+        try std.testing.expectEqualSlices(u8, &proto.mac_broadcast, frame[0..6]);
+        try std.testing.expectEqualSlices(u8, &mac, frame[6..12]);
+        const dg = proto.parseUdp(frame[0..len]).?;
+        try std.testing.expectEqual(port_client, dg.src_port);
+        try std.testing.expectEqual(port_server, dg.dst_port);
+        try std.testing.expectEqualSlices(u8, &proto.ip_any, &dg.src_ip);
+        try std.testing.expectEqualSlices(u8, &proto.ip_broadcast, &dg.dst_ip);
+        try std.testing.expectEqualSlices(u8, &.{t}, findOption(dg.payload, opt_message_type).?);
+        if (t == msg_request) {
+            try std.testing.expectEqualSlices(u8, &.{ 10, 0, 2, 15 }, findOption(dg.payload, opt_requested_ip).?);
+            try std.testing.expectEqualSlices(u8, &.{ 10, 0, 2, 2 }, findOption(dg.payload, opt_server_id).?);
+        }
+    }
 }
 
 /// The ACK is the authority, not the offer: a server may hand over
@@ -359,7 +390,7 @@ test "a frame of any bytes is refused or parsed inside itself, by UDP, ARP and D
     at = option(p, at, opt_router, &.{ 10, 0, 2, 2 });
     p[at] = opt_end;
     at += 1;
-    const len = proto.writeUdp(&good, mac, proto.mac_broadcast, .{ 10, 0, 2, 2 }, proto.ip_broadcast, port_server, port_client, at);
+    const len = proto.writeUdp(&good, .{ .mac = mac, .ip = .{ 10, 0, 2, 2 } }, .{ .mac = proto.mac_broadcast, .ip = proto.ip_broadcast }, .{ .src = port_server, .dst = port_client }, at);
     try std.testing.expect(replyFor(proto.parseUdp(good[0..len]).?.payload, 7, mac));
 
     var prng = std.Random.DefaultPrng.init(80);

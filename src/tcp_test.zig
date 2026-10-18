@@ -167,7 +167,7 @@ const Peer = struct {
         const olen: usize = if (flags & flag_syn != 0 and self.mss != null) 4 else 0;
         if (olen > 0) options = .{ 2, 4, @intCast(self.mss.? >> 8), @intCast(self.mss.? & 0xFF) };
         const len = header_len + olen;
-        const frame_len = proto.writeIpv4(buf, client_mac, server_mac, self.ip, server_ip, proto.proto_tcp, len + data.len);
+        const frame_len = proto.writeIpv4(buf, .{ .mac = client_mac, .ip = self.ip }, .{ .mac = server_mac, .ip = server_ip }, proto.proto_tcp, len + data.len);
         const t = buf[segment_at..][0 .. len + data.len];
         @memcpy(t[0..2], &proto.be16(self.port));
         @memcpy(t[2..4], &proto.be16(self.to_port));

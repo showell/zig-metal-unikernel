@@ -855,15 +855,7 @@ pub const Table = struct {
             .options = if (flags & flag_syn != 0) &mss_option else &.{},
             .data = payload,
         };
-        const frame_len = proto.writeIpv4(
-            self.out,
-            self.local_mac,
-            to.mac,
-            self.local_ip,
-            to.ip,
-            proto.proto_tcp,
-            s.len(),
-        );
+        const frame_len = proto.writeIpv4(self.out, .{ .mac = self.local_mac, .ip = self.local_ip }, .{ .mac = to.mac, .ip = to.ip }, proto.proto_tcp, s.len());
         const t = self.out[segment_at..][0..s.len()];
         s.write(t);
         @memcpy(t[16..18], &proto.be16(proto.pseudoChecksum(self.local_ip, to.ip, proto.proto_tcp, t)));
