@@ -18,7 +18,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/tools/tier_lib.sh"
 need zig python3
 
 NOWHERE="$HERE/.no-sibling"
-ALONE=(-Dgopher-root="$NOWHERE" -Dwebbox-root="$NOWHERE")
+ALONE=(-Dgopher-root="$NOWHERE" -Dwebbox-root="$NOWHERE" -Dshale-root="$NOWHERE")
 
 # The unit tests, the simulators' own tests, this repo's kernels and host
 # programs type-checked, `zig fmt --check src`, the machine lint and its

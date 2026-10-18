@@ -1,12 +1,12 @@
 #!/bin/bash
-# **TIER 3: TIER 2, AND ZIG-WEBBOX AND THE APPLICATIONS** (metal-vmm QUEUE
-# 197). Everything that compiles or judges code outside this repo: the
-# library's own tests and the limits it copies; the unit tests' pinned body
+# **TIER 3: TIER 2, AND ZIG-WEBBOX, SHALE AND THE APPLICATIONS** (metal-vmm
+# QUEUE 197). Everything that compiles or judges code outside this repo: the
+# libraries' own tests and the limits webbox copies; the unit tests' pinned body
 # rule against the library's; gopher.elf (angry-gopher's chat) type-checked,
 # built and judged against its Linux build on two machines; the site
 # volume, and metal-vmm on gopher.elf (the PC-shaped machine's rests, the
-# timeouts). Needs angry-gopher and zig-webbox beside this checkout (or
-# GOPHER_ROOT, WEBBOX_ROOT), and tier 2's metal-vmm and KVM. Dog Park is not
+# timeouts). Needs angry-gopher, zig-webbox and shale beside this checkout
+# (or GOPHER_ROOT, WEBBOX_ROOT, SHALE_ROOT), and tier 2's metal-vmm and KVM. Dog Park is not
 # judged here (Steve, 2026-10-13): an application is not this repo's test of
 # itself.
 #
@@ -20,7 +20,7 @@
 # **THE CHAT JUDGE RUNS FAT32 HERE, FAT16 IN long.sh** (QUEUE.md item 88):
 # prod's data is a FAT32 volume.
 #
-# **SKIP="word …"** leaves slow steps out (tools/skip_lib.sh): webbox-test, vmm-pc, pair, sleeps, vmm-timeouts, gopher-judges.
+# **SKIP="word …"** leaves slow steps out (tools/skip_lib.sh): webbox-test, shale-test, vmm-pc, pair, sleeps, vmm-timeouts, gopher-judges.
 # A run with a skip ends NOT A PASS, exit 3, and keeps no verdict.
 TIER="tier 3"
 source "$(dirname "${BASH_SOURCE[0]}")/tools/tier_lib.sh"
@@ -42,9 +42,9 @@ if [ -z "${VERDICT_PAIR:-}" ]; then
     python3 tools/verdicts.py pair
 fi
 
-# **THE DOCS' CITED PATHS AND NAMES**, this repo's (zig-webbox's
+# **THE DOCS' CITED PATHS AND NAMES**, this repo's (shale's
 # tools/doc_check.shale, a few seconds): before the minutes.
-(cd "${WEBBOX_ROOT:-$HERE/../zig-webbox}" && zig build doc-check -- only=zig-metal-unikernel) > "$VERDICTS/tier3-docs.txt" 2>&1 \
+(cd "$SHALE_ROOT" && zig build doc-check -- only=zig-metal-unikernel) > "$VERDICTS/tier3-docs.txt" 2>&1 \
     || { failed+=(docs); grep -E "gone |ambiguous |names gone |findings" "$VERDICTS/tier3-docs.txt" | head -9; }
 lap "the docs' cited paths and names"
 
@@ -79,7 +79,11 @@ zig build check-apps "${ZIG_SIBLINGS[@]}" 2>&1 | grep -E "error|NOT type-checked
 if ! skip webbox-test; then
     (cd "$WEBBOX_ROOT" && zig build test 2>&1 | tail -5; exit "${PIPESTATUS[0]}") || failed+=(webbox-test)
 fi
-lap "limits, pinned, check-apps, zig-webbox's tests"
+# Shale's own tests, on its Linux host.
+if ! skip shale-test; then
+    (cd "$SHALE_ROOT" && zig build test 2>&1 | tail -5; exit "${PIPESTATUS[0]}") || failed+=(shale-test)
+fi
+lap "limits, pinned, check-apps, zig-webbox's and shale's tests"
 
 # **THE SITE VOLUME, FROM THIS CHECKOUT** (tools/site_volume.py): what
 # metal-vmm's timeouts.sh and pc_vs_microvm.sh judge.

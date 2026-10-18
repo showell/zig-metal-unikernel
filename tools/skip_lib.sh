@@ -19,7 +19,7 @@
 # Only the steps worth skipping are named: the slow ones, and those whose
 # skipping leaves the rest meaningful. Builds a later step needs are not.
 
-STEPS="test tcp-traces native probes droplet-boot droplet-hello droplet-sleeps screen vmm-check vmm-same webbox-test vmm-pc pair sleeps vmm-timeouts gopher-judges sim fault-sweeps lossy rough native-full volume-sweep fat16-judge"
+STEPS="test tcp-traces native probes droplet-boot droplet-hello droplet-sleeps screen vmm-check vmm-same webbox-test shale-test vmm-pc pair sleeps vmm-timeouts gopher-judges sim fault-sweeps lossy rough native-full volume-sweep fat16-judge"
 
 # **NOTHING NARROWS A JUDGE BEHIND THE GATES' BACK** (the second cold
 # review, 2026-10-16): JUDGE_QUICK left in a shell silently dropped

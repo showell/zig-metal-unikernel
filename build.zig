@@ -130,6 +130,11 @@ pub fn build(b: *std.Build) void {
     const webbox_root = b.option([]const u8, "webbox-root", "the zig-webbox checkout") orelse
         b.pathFromRoot("../zig-webbox");
     const webbox_src = b.fmt("{s}/src", .{webbox_root});
+    // **SHALE**, the script language an application runs on its own data,
+    // from its own checkout (shale), compiled as webbox is, with this
+    // machine's `host_io`. -Dshale-root=<dir> names another checkout.
+    const shale_root = b.option([]const u8, "shale-root", "the shale checkout") orelse
+        b.pathFromRoot("../shale");
 
     const all = b.step("kernels", "every kernel");
     for (kernels) |k| {
@@ -207,9 +212,14 @@ pub fn build(b: *std.Build) void {
         .red_zone = false,
         .imports = &.{.{ .name = "host_io", .module = host_io }},
     });
+    _ = b.addModule("shale", .{
+        .root_source_file = .{ .cwd_relative = b.fmt("{s}/src/shale.zig", .{shale_root}) },
+        .red_zone = false,
+        .imports = &.{ .{ .name = "host_io", .module = host_io }, .{ .name = "webbox", .module = webbox } },
+    });
     // The kernel's parts every application's kernel shares, exported for
     // `addAppKernel` (a dependent package reaches them through it, not by
-    // name): `metal`, `host_io` and `webbox` above, and `gm_build`.
+    // name): `metal`, `host_io`, `webbox` and `shale` above, and `gm_build`.
     const gm_build = gm_opts.createModule();
     b.modules.put(b.allocator, b.dupe("gm_build"), gm_build) catch @panic("out of memory");
     // **THE APPLICATION, ANY APPLICATION** (Phase B step 4): an application
@@ -270,7 +280,7 @@ pub fn build(b: *std.Build) void {
     // pass in silence.
     const check_step = b.step("check", "type-check this repo's own kernels (analysis only, not codegen or link), and build native and droplet (part of `test`)");
     // **THE APPLICATIONS' KERNELS, A TIER OF THEIR OWN** (metal-vmm QUEUE
-    // 197): gopher.elf needs angry-gopher's and zig-webbox's checkouts, so
+    // 197): gopher.elf needs angry-gopher's, zig-webbox's and shale's checkouts, so
     // its check is tier 3's (tier3.sh), never `test`'s: a missing sibling
     // must not fail tier 0.
     const check_apps = b.step("check-apps", "type-check the applications' kernels (gopher.elf), from their checkouts (tier 3)");
@@ -284,7 +294,7 @@ pub fn build(b: *std.Build) void {
         if (p == .none) continue;
         // The same port and checkout as this build's, or gopher.elf is
         // checked against the defaults' (or not at all) for every plant.
-        const one = b.addSystemCommand(&.{ b.graph.zig_exe, "build", "check", "check-apps", "-Dcoverage", b.fmt("-Dplant={s}", .{@tagName(p)}), b.fmt("-Dgopher-root={s}", .{gopher_root}), b.fmt("-Dwebbox-root={s}", .{webbox_root}) });
+        const one = b.addSystemCommand(&.{ b.graph.zig_exe, "build", "check", "check-apps", "-Dcoverage", b.fmt("-Dplant={s}", .{@tagName(p)}), b.fmt("-Dgopher-root={s}", .{gopher_root}), b.fmt("-Dwebbox-root={s}", .{webbox_root}), b.fmt("-Dshale-root={s}", .{shale_root}) });
         one.setCwd(b.path("."));
         check_plants.dependOn(&one.step);
     }
@@ -303,7 +313,7 @@ pub fn build(b: *std.Build) void {
     // asset list is its table. tools/verdicts.py says whether it is fresh, as
     // gates.sh asks it, and one not fresh fails the check.
     const port_state: []const u8 = blk: {
-        const out = b.runAllowFail(&.{ "env", b.fmt("GOPHER_ROOT={s}", .{gopher_root}), b.fmt("WEBBOX_ROOT={s}", .{webbox_root}), "python3", b.pathFromRoot("tools/verdicts.py"), "fresh" }, &port_code, .ignore) catch break :blk "tools/verdicts.py could not be run";
+        const out = b.runAllowFail(&.{ "env", b.fmt("GOPHER_ROOT={s}", .{gopher_root}), b.fmt("WEBBOX_ROOT={s}", .{webbox_root}), b.fmt("SHALE_ROOT={s}", .{shale_root}), "python3", b.pathFromRoot("tools/verdicts.py"), "fresh" }, &port_code, .ignore) catch break :blk "tools/verdicts.py could not be run";
         break :blk std.mem.trim(u8, out, " \t\r\n");
     };
     if (std.mem.eql(u8, port_state, "fresh")) {
@@ -861,9 +871,9 @@ pub const App = struct {
 ///     const elf = zmu.addAppKernel(b, kernel, .{ .name = "x.elf", .module = app, .assets = b.path("assets.zon"), .optimize = .ReleaseSafe });
 ///
 /// The kernel's parts stay the kernel's: probe/gopher.zig as the root, its
-/// link script and entry, and its `metal`, `host_io`, `webbox` and
-/// `gm_build` modules (this package's `-Dwebbox-root`, `-Drestart` and
-/// `-Dcoverage` are the dependency's options). The caller hands over only
+/// link script and entry, and its `metal`, `host_io`, `webbox`, `shale`
+/// and `gm_build` modules (this package's `-Dwebbox-root`, `-Dshale-root`,
+/// `-Drestart` and `-Dcoverage` are the dependency's options). The caller hands over only
 /// the application.
 ///
 /// **AN EMBEDDED NAME THE MODULE ALREADY IMPORTS IS THE CALLER'S**: a file
@@ -880,7 +890,7 @@ fn appKernel(b: *std.Build, kb: *std.Build, a: App) *std.Build.Step.Compile {
     const m = a.module;
     if (m.resolved_target != null or m.optimize != null)
         std.process.fatal("addAppKernel({s}): the application's module names a target or optimize mode; it takes the kernel's (leave both unset)", .{a.name});
-    for ([_][]const u8{ "host_io", "webbox" }) |name| {
+    for ([_][]const u8{ "host_io", "webbox", "shale" }) |name| {
         if (m.import_table.contains(name))
             std.process.fatal("addAppKernel({s}): the application's module imports `{s}` itself; the kernel supplies this machine's (drop the import)", .{ a.name, name });
     }
@@ -892,6 +902,7 @@ fn appKernel(b: *std.Build, kb: *std.Build, a: App) *std.Build.Step.Compile {
     m.import_table = .empty;
     m.addImport("host_io", exported(kb, "host_io"));
     m.addImport("webbox", exported(kb, "webbox"));
+    m.addImport("shale", exported(kb, "shale"));
     for (callers.keys(), callers.values()) |name, module| m.addImport(name, module);
     // A page embeds these by name, and a name that no build graph declared is
     // a compile error with a confusing message.
