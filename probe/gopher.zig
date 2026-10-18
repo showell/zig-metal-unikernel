@@ -781,15 +781,25 @@ pub fn kmain() noreturn {
 
     // The boot is over: the console is written out in full from here.
     serial.immediate();
+    sayGoodbyes(&wire, &table, hub, lease.address, conf.idle_ns);
+    stopReport(&wire, &table, hub, deepest);
+    serial.pass();
+}
+
+/// **THE GOODBYES, WHEN THE BOOT ENDS**: responses still on their way are
+/// given the idle time to finish (their turns run inside `pump`), then the
+/// rest are reset; every held stream ends; and connections still closing are
+/// given two seconds of turns to be acknowledged.
+fn sayGoodbyes(wire: *stream.Wire, table: *tcp.Table, hub: *Hub, address: [4]u8, idle_ns: u64) void {
     // Responses still on their way are given the idle time
     // to finish (their turns run inside `pump`), then the rest are reset.
     const draining_from = Io.awakeNs() orelse 0;
-    while (draining_now > 0 and (Io.awakeNs() orelse 0) - draining_from < conf.idle_ns) {
-        stream.pumpOrRestOn(&wire, &table, lease.address);
+    while (draining_now > 0 and (Io.awakeNs() orelse 0) - draining_from < idle_ns) {
+        stream.pumpOrRestOn(wire, table, address);
     }
     for (&draining, 0..) |*slot, i| {
         if (slot.*) |*d| {
-            table.abandon(&wire, i, .slow_client);
+            table.abandon(wire, i, .slow_client);
             serial.put("  let go at the end: the client stopped taking the response\n");
             d.spill.deinit();
             table.release(i);
@@ -801,12 +811,19 @@ pub fn kmain() noreturn {
     // moment to be acknowledged.
     stream.after_arrivals = null;
     for (&held) |*slot| {
-        if (slot.* != null) endStream(slot, &wire, &table, hub, .stopping);
+        if (slot.* != null) endStream(slot, wire, table, hub, .stopping);
     }
     const stopping_at = Io.awakeNs() orelse 0;
-    while (closing(&table) and (Io.awakeNs() orelse 0) - stopping_at < 2 * std.time.ns_per_s) {
-        stream.pumpOrRestOn(&wire, &table, lease.address);
+    while (closing(table) and (Io.awakeNs() orelse 0) - stopping_at < 2 * std.time.ns_per_s) {
+        stream.pumpOrRestOn(wire, table, address);
     }
+}
+
+/// **THE MACHINE'S LAST WORDS**, on the console: what the stop cut, the
+/// streams', the connections' and TCP's counts, the pages, each volume's
+/// leak line (metal-vmm's judge reads them), what was served, and the
+/// stack's high water.
+fn stopReport(wire: *stream.Wire, table: *tcp.Table, hub: *Hub, deepest: usize) void {
     // **A RESPONSE CUT BY THE STOP IS SAID TO BE.** One still unacknowledged
     // now is never finished: its request counted as answered, and its client
     // has part of the answer. Only a request limit stops the machine.
@@ -879,7 +896,6 @@ pub fn kmain() noreturn {
     serial.put(" of ");
     serial.putDec(stack.size);
     serial.put(" bytes\n");
-    serial.pass();
 }
 
 /// The oldest connection with something to serve, or null. **THE TURN
