@@ -230,8 +230,9 @@ back:
     });
 
 The module names no target or optimize mode (it takes the kernel's) and
-imports neither `host_io` nor `webbox`: `addAppKernel` adds this machine's
-(webbox from `../zig-webbox`, or the dependency's `-Dwebbox-root`). Each
+imports neither `host_io`, `webbox` nor `shale`: `addAppKernel` adds this
+machine's (webbox from `../zig-webbox`, shale from `../shale`, or the
+dependency's `-Dwebbox-root` and `-Dshale-root`). Each
 `.embedded` row of `assets.zon` is compiled in by name from its path,
 relative to `assets.zon`, **unless the module already imports that name**:
 a file the caller's own build makes (a wasm, say) is imported by the caller

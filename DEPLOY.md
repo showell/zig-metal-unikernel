@@ -185,12 +185,12 @@ what it found.
   answered in the response); `background` makes a run stepped between
   requests (10,000 reads), read back with a `GET`.
 - **On Dog Park:** background only.
-- **The cookbook:** zig-webbox's `src/script/examples/` (lynrummy.com),
+- **The cookbook:** shale's `src/script/examples/` (lynrummy.com),
   dog-park's `tools/shale/`.
 
 ```
 cd <a scratch folder> && cp <script>.shale .
-~/showell_repos/zig-webbox/zig-out/bin/shale-sign sign <script>.shale lynrummy.com   # or: background
+~/showell_repos/shale/zig-out/bin/shale-sign sign <script>.shale lynrummy.com   # or: background
 SHALE_ADMIN_KEY=$(cat ~/.gopher_api_key) sh -c '<the curl line it printed>'
 curl -sS -H "Authorization: Bearer $(cat ~/.gopher_api_key)" https://lynrummy.com/admin/script   # a background run's state and output
 ```
