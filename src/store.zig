@@ -114,6 +114,42 @@ pub const Store = struct {
     pub fn replace(s: Store, path: []const u8, bytes: []const u8) Error!void {
         return s.vtable.replace(s.ptr, path, bytes);
     }
+
+    /// **THE STORE A `*T` IS**: its vtable made from `T`'s own `read`,
+    /// `write`, `append`, `list`, `remove` and `replace`, each called on the
+    /// `T` behind the pointer. Each store wrote these six casts by hand, the
+    /// same each time (shale's cookbook/zig/clones.shale found the three).
+    pub fn of(comptime T: type, ptr: *T) Store {
+        return .{ .ptr = ptr, .vtable = vtableOf(T) };
+    }
+
+    fn vtableOf(comptime T: type) *const VTable {
+        const S = struct {
+            fn self(p: *anyopaque) *T {
+                return @ptrCast(@alignCast(p));
+            }
+            fn readV(p: *anyopaque, path: []const u8, out: []u8) Error!usize {
+                return self(p).read(path, out);
+            }
+            fn writeV(p: *anyopaque, path: []const u8, bytes: []const u8) Error!void {
+                return self(p).write(path, bytes);
+            }
+            fn appendV(p: *anyopaque, path: []const u8, bytes: []const u8) Error!void {
+                return self(p).append(path, bytes);
+            }
+            fn listV(p: *anyopaque, path: []const u8, each: Each) Error!void {
+                return self(p).list(path, each);
+            }
+            fn removeV(p: *anyopaque, path: []const u8) Error!void {
+                return self(p).remove(path);
+            }
+            fn replaceV(p: *anyopaque, path: []const u8, bytes: []const u8) Error!void {
+                return self(p).replace(path, bytes);
+            }
+            const vtable = VTable{ .read = readV, .write = writeV, .append = appendV, .list = listV, .remove = removeV, .replace = replaceV };
+        };
+        return &S.vtable;
+    }
 };
 
 /// A path's parts, checked against the rules (the file's comment), into

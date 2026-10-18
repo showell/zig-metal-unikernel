@@ -27,17 +27,8 @@ pub const LinuxStore = struct {
     root: Io.Dir,
 
     pub fn store_(l: *LinuxStore) store.Store {
-        return .{ .ptr = l, .vtable = &vtable };
+        return store.Store.of(LinuxStore, l);
     }
-
-    const vtable = store.Store.VTable{
-        .read = readV,
-        .write = writeV,
-        .append = appendV,
-        .list = listV,
-        .remove = removeV,
-        .replace = replaceV,
-    };
 
     const path_bytes = store.max_parts * (store.max_part + store.temp_prefix.len + 1);
 
@@ -209,27 +200,5 @@ pub const LinuxStore = struct {
             const size: u64 = if (is_dir) 0 else (d.statFile(l.io, entry.name, .{}) catch |e| return mapOpen(e)).size;
             each.call(each.context, .{ .name = entry.name, .kind = if (is_dir) .directory else .file, .size = size });
         }
-    }
-
-    fn self(p: *anyopaque) *LinuxStore {
-        return @ptrCast(@alignCast(p));
-    }
-    fn readV(p: *anyopaque, path: []const u8, out: []u8) Error!usize {
-        return self(p).read(path, out);
-    }
-    fn writeV(p: *anyopaque, path: []const u8, bytes: []const u8) Error!void {
-        return self(p).write(path, bytes);
-    }
-    fn appendV(p: *anyopaque, path: []const u8, bytes: []const u8) Error!void {
-        return self(p).append(path, bytes);
-    }
-    fn listV(p: *anyopaque, path: []const u8, each: store.Each) Error!void {
-        return self(p).list(path, each);
-    }
-    fn removeV(p: *anyopaque, path: []const u8) Error!void {
-        return self(p).remove(path);
-    }
-    fn replaceV(p: *anyopaque, path: []const u8, bytes: []const u8) Error!void {
-        return self(p).replace(path, bytes);
     }
 };

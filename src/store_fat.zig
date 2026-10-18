@@ -27,17 +27,8 @@ pub const FatStore = struct {
     vol: *disk_fat.Volume,
 
     pub fn store_(f: *FatStore) store.Store {
-        return .{ .ptr = f, .vtable = &vtable };
+        return store.Store.of(FatStore, f);
     }
-
-    const vtable = store.Store.VTable{
-        .read = readV,
-        .write = writeV,
-        .append = appendV,
-        .list = listV,
-        .remove = removeV,
-        .replace = replaceV,
-    };
 
     /// What a call that met FAT's error was doing: writing, or looking (a
     /// read, a remove, a listing).
@@ -162,27 +153,5 @@ pub const FatStore = struct {
             if (store.hidden(name)) continue;
             each.call(each.context, .{ .name = name, .kind = if (e.isDirectory()) .directory else .file, .size = e.size });
         }
-    }
-
-    fn self(p: *anyopaque) *FatStore {
-        return @ptrCast(@alignCast(p));
-    }
-    fn readV(p: *anyopaque, path: []const u8, out: []u8) Error!usize {
-        return self(p).read(path, out);
-    }
-    fn writeV(p: *anyopaque, path: []const u8, bytes: []const u8) Error!void {
-        return self(p).write(path, bytes);
-    }
-    fn appendV(p: *anyopaque, path: []const u8, bytes: []const u8) Error!void {
-        return self(p).append(path, bytes);
-    }
-    fn listV(p: *anyopaque, path: []const u8, each: store.Each) Error!void {
-        return self(p).list(path, each);
-    }
-    fn removeV(p: *anyopaque, path: []const u8) Error!void {
-        return self(p).remove(path);
-    }
-    fn replaceV(p: *anyopaque, path: []const u8, bytes: []const u8) Error!void {
-        return self(p).replace(path, bytes);
     }
 };

@@ -37,17 +37,8 @@ pub const Model = struct {
     }
 
     pub fn store_(m: *Model) store.Store {
-        return .{ .ptr = m, .vtable = &vtable };
+        return store.Store.of(Model, m);
     }
-
-    const vtable = store.Store.VTable{
-        .read = readV,
-        .write = writeV,
-        .append = appendV,
-        .list = listV,
-        .remove = removeV,
-        .replace = replaceV,
-    };
 
     /// `parts[0..n]`, folded and joined, in `buf`.
     fn key(parts: []const []const u8, buf: []u8) []const u8 {
@@ -299,28 +290,6 @@ pub const Model = struct {
             }
         }
         return true;
-    }
-
-    fn self(p: *anyopaque) *Model {
-        return @ptrCast(@alignCast(p));
-    }
-    fn readV(p: *anyopaque, path: []const u8, out: []u8) Error!usize {
-        return self(p).read(path, out);
-    }
-    fn writeV(p: *anyopaque, path: []const u8, bytes: []const u8) Error!void {
-        return self(p).write(path, bytes);
-    }
-    fn appendV(p: *anyopaque, path: []const u8, bytes: []const u8) Error!void {
-        return self(p).append(path, bytes);
-    }
-    fn listV(p: *anyopaque, path: []const u8, each: store.Each) Error!void {
-        return self(p).list(path, each);
-    }
-    fn removeV(p: *anyopaque, path: []const u8) Error!void {
-        return self(p).remove(path);
-    }
-    fn replaceV(p: *anyopaque, path: []const u8, bytes: []const u8) Error!void {
-        return self(p).replace(path, bytes);
     }
 };
 
