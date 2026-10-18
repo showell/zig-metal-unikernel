@@ -6,7 +6,6 @@
 //! a backup taken on Linux can be restored here — which is the whole point of
 //! the volume being a real filesystem rather than a private format.
 
-const std = @import("std");
 const metal = @import("metal");
 const serial = metal.serial;
 const virtio = metal.virtio;

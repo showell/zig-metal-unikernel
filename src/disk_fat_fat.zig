@@ -6,9 +6,7 @@
 
 const std = @import("std");
 const builtin = @import("builtin");
-const virtio = @import("virtio.zig");
 const props = @import("coverage");
-const plant = @import("plant.zig");
 const dirent = @import("disk_fat_dirent.zig");
 const Cluster = dirent.Cluster;
 const le32 = dirent.le32;

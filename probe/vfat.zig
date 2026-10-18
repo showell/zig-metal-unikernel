@@ -10,7 +10,6 @@
 //! the sequence numbers, orphaned entries, `.` and `..`. Agreeing with our own
 //! reader would prove very little.
 
-const std = @import("std");
 const metal = @import("metal");
 const serial = metal.serial;
 const virtio = metal.virtio;

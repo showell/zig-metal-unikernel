@@ -26,9 +26,7 @@
 //! difference between those two designs is the whole lesson here.
 
 const std = @import("std");
-const props = @import("coverage");
 const serial = @import("serial.zig");
-const virtio = @import("virtio.zig");
 const stack = @import("stack.zig");
 const PageCache = @import("page_cache.zig").PageCache;
 const disk_fat = @import("disk_fat.zig");

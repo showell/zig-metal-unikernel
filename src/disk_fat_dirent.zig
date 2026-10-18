@@ -7,9 +7,6 @@ const std = @import("std");
 const civil = @import("civil.zig");
 
 pub const dirent_size: u32 = 32;
-const attr_read_only: u8 = 0x01;
-const attr_hidden: u8 = 0x02;
-const attr_system: u8 = 0x04;
 pub const attr_volume_label: u8 = 0x08;
 pub const attr_directory: u8 = 0x10;
 /// A long-name part: read-only, hidden, system and volume label at once,

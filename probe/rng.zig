@@ -9,7 +9,6 @@
 //! and one would not fit here. What these catch is the failure that matters on
 //! a new machine: a source that is quietly returning a constant.
 
-const std = @import("std");
 const metal = @import("metal");
 const serial = metal.serial;
 const rng = metal.rng;

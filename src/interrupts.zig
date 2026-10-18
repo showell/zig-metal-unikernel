@@ -73,7 +73,6 @@ const spurious_vector: u8 = 0xFF;
 const lapic_base: usize = apic_rule.lapic_base;
 const lapic_id = 0x020;
 const lapic_tpr = 0x080;
-const lapic_eoi = 0x0B0;
 const lapic_svr = 0x0F0;
 const lapic_lvt_timer = 0x320;
 const lapic_lvt_lint0 = 0x350;

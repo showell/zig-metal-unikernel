@@ -38,7 +38,6 @@
 //! - **Quiescence:** by the horizon every slot of both tables is closed.
 
 const std = @import("std");
-const proto = @import("proto.zig");
 const tcp = @import("tcp.zig");
 const invariants = @import("tcp_check.zig");
 const props = @import("coverage");

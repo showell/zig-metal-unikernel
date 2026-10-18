@@ -18,7 +18,6 @@
 //! `append` is `disk_fat.writeInto` at the file's end, which links and writes
 //! before it changes the entry's size: a cut leaves the old file or the new.
 
-const std = @import("std");
 const store = @import("store.zig");
 const disk_fat = @import("disk_fat.zig");
 const Error = store.Error;

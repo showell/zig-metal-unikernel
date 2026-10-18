@@ -6,7 +6,6 @@
 const std = @import("std");
 const tcp = @import("tcp.zig");
 const arp = @import("arp.zig");
-const proto = @import("proto.zig");
 
 /// **HOW A FETCH ENDS**, one exit code each, so a judge reads the outcome
 /// from the status alone. 1 is the program's own: it could not start.

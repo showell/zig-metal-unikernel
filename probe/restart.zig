@@ -28,7 +28,6 @@
 //! which is how a judge sees that one happened, but this probe wants to see
 //! the next boot.
 
-const std = @import("std");
 const metal = @import("metal");
 const serial = metal.serial;
 const port = metal.port;

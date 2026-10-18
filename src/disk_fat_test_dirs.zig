@@ -6,7 +6,6 @@
 
 const std = @import("std");
 const disk_fat = @import("disk_fat.zig");
-const virtio = @import("virtio.zig");
 const test_disk = @import("test_disk.zig");
 const testing = std.testing;
 const Layout = test_disk.Layout;
