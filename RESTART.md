@@ -222,7 +222,7 @@ boot, and should read as one.
 
   Bytes `0x40` to `0x7F` past what SeaBIOS reads; the probe uses `0x7D`.
   The box Claude should check the bytes chosen against SeaBIOS's
-  `src/hw/rtc.h` and QEMU's `pc_cmos_init` before using them.
+  `<seabios>/src/hw/rtc.h` and QEMU's `pc_cmos_init` before using them.
 - **The log ring (item 6) moves its bytes out of `.bss`** to a fixed region
   past `_kernel_end`, kept out of the page allocator.
   - **Today** `serial.ring`'s header is in `.data` and its bytes in `.bss`,

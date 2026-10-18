@@ -11,7 +11,7 @@ Checked first, and the ecosystem is thinner than expected. The nearest thing is
 FatFs, a C library, not a native Zig implementation.
 [**zig-osdev/disk-image-step**](https://github.com/zig-osdev/disk-image-step)
 does FAT12/16/32 but at *build* time, to make images, not to read them at
-runtime. `pluto`'s `mkfat32.zig` is likewise an image writer. The mature
+runtime. `pluto`'s `<pluto>/mkfat32.zig` is likewise an image writer. The mature
 runtime implementations — [fat_io_lib](https://github.com/ultraembedded/fat_io_lib),
 gristle, SEGGER emFile — are all C.
 

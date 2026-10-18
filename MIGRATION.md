@@ -58,8 +58,8 @@ From angry-gopher's own code (`roots.zig`, `chat_store.zig`, `users.zig`,
 | doc slug | `[a-z0-9]+(-[a-z0-9]+)*`, 1–80, lower case (`validDocSlug`) | `data/chat/users/<uid>/docs/<slug>.md` |
 | upload | 16 random bytes in hex, `.` extension | `<sid>.uploads/<32 hex>.<ext>` |
 | user, player, conversation | digits; `p<n>`; `<a>_<b>` | `auth/<id>/`, `data/players/<id>/`, `data/chat/<a>_<b>/` |
-| fixed names | `_session_secret`, `next-id.txt`, `last-seen` (users and players), `upload-bytes`, `admin`, `api-key`, `password`, `name`, `code.md`, `images.md`, `last-conv` | |
-| placed by hand | `links.md`: `chat_links.zig` reads it, and nothing in the application writes it | `data/chat/users/<uid>/links.md` |
+| fixed names | `_session_secret`, `<root>/next-id.txt`, `last-seen` (users and players), `upload-bytes`, `admin`, `api-key`, `password`, `name`, `<conversation>/code.md`, `<conversation>/images.md`, `last-conv` | |
+| placed by hand | `<uid>/links.md`: `chat_links.zig` reads it, and nothing in the application writes it | `data/chat/users/<uid>/links.md` |
 
 Every name is ASCII from `[A-Za-z0-9._-]`. No name ends in a dot or a space.
 The deepest path is about 200 bytes and seven levels:
@@ -69,7 +69,7 @@ The deepest path is about 200 bytes and seven levels:
 
 ### Names that differ only in case — **the application can produce these**
 
-- **Linux** holds `Plan.md` and `plan.md` side by side.
+- **Linux** holds `<dir>/Plan.md` and `<dir>/plan.md` side by side.
 - **FAT** does not: names are compared without case.
   - `shutil.copytree` onto a vfat mount opens the second name, finds the
     first, and writes over it. There is no error, and one session is gone.

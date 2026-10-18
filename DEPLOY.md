@@ -221,7 +221,7 @@ Dog Park's image carries its public key instead (dog-park `droplet/image.mjs`).
 - angry-gopher's `deploy/Caddyfile` (with the shared `access_log`
   snippet), and its `deploy/README.md` for installing it;
 - dog-park's `droplet/dogpark.lynrummy.com.caddy`;
-- roc-apps' `ops/roc.lynrummy.com.caddy`.
+- roc-apps' `<roc-apps>/ops/roc.lynrummy.com.caddy`.
 
 On prod they are installed under `/etc/caddy/`, with the site blocks in
 `/etc/caddy/sites/`. **A new access log must exist and be Caddy's before

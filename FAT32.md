@@ -200,7 +200,7 @@ wanted, since the FAT-memory limit in §9 bites first.
 ### 11. Names
 
 The module is still called `disk_fat.zig`, and its error is `NotFat16`. Renaming
-it (`fat.zig`, with `NotFat`) touches every importer. Do it in a separate,
+it (to fat.zig, with `NotFat`) touches every importer. Do it in a separate,
 mechanical commit, or not at all.
 
 ## What stays
