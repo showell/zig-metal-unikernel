@@ -42,6 +42,12 @@ if [ -z "${VERDICT_PAIR:-}" ]; then
     python3 tools/verdicts.py pair
 fi
 
+# **THE DOCS' CITED PATHS AND NAMES**, this repo's (zig-webbox's
+# tools/doc_check.shale, a few seconds): before the minutes.
+(cd "${WEBBOX_ROOT:-$HERE/../zig-webbox}" && zig build doc-check -- only=zig-metal-unikernel) > "$VERDICTS/tier3-docs.txt" 2>&1 \
+    || { failed+=(docs); grep -E "gone |ambiguous |names gone |findings" "$VERDICTS/tier3-docs.txt" | head -9; }
+lap "the docs' cited paths and names"
+
 zig build gopher "${ZIG_SIBLINGS[@]}" 2>&1 | grep error
 [ "${PIPESTATUS[0]}" = 0 ] || failed+=(gopher-build)
 lap "gopher.elf"

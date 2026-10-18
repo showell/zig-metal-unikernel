@@ -71,6 +71,8 @@ tier 0 does NOT check, and which tier does:
   - the probe kernels booted, the judges' own tests, the FAT image tools,
     the droplet's boots (QEMU, dosfstools, gdisk, mtools): tier 1
   - metal-vmm against this repo's kernels: tier 2
+  - the docs' cited paths and names (zig-webbox's doc check, which reads
+    every sibling): tier 3
   - src/pinned/webbox_body.zig against zig-webbox's body.zig (zig build
     pinned); gopher.elf type-checked (zig build check-apps) and built;
     the limits zig-webbox copies (tools/check_limits.py); zig-webbox's own
