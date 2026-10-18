@@ -71,6 +71,8 @@ const webbox = @import("webbox");
 const config_file = @import("config.zig");
 const volumes = @import("volumes.zig");
 const host_facts_file = @import("host_facts.zig");
+const stream_turn_file = @import("stream_turn.zig");
+const streamTurn = stream_turn_file.streamTurn;
 const metalFacts = host_facts_file.metalFacts;
 const bootDisk = volumes.bootDisk;
 const boot_read_tries = volumes.boot_read_tries;
@@ -206,7 +208,7 @@ const Held = struct {
     stuck_since: ?i96 = null,
     stuck_una: u32 = 0,
 };
-var held: [max_connections]?Held = @splat(null);
+pub var held: [max_connections]?Held = @splat(null);
 
 /// **RESPONSES STILL ON THEIR WAY**, after their handler finished: what the
 /// send queue had no room for (`stream.Spill`), indexed by connection, as
@@ -219,8 +221,8 @@ const Draining = struct {
     since: i96,
     una: u32,
 };
-var draining: [max_connections]?Draining = @splat(null);
-var draining_now: usize = 0;
+pub var draining: [max_connections]?Draining = @splat(null);
+pub var draining_now: usize = 0;
 
 /// **WHAT THE HOST KNOWS OF EVERY CONNECTION'S BODY** (webbox's body.zig,
 /// metal-vmm QUEUE 166, 169, 170), and what it does next with each: the
@@ -1214,127 +1216,12 @@ fn serveOne(
     serial.put(" us\n");
 }
 
-/// One pass over the responses still on their way: queue more of each, close
-/// the ones that are done, reset the ones whose peer stopped taking them.
-fn serviceDraining(wire: *stream.Wire, table: *tcp.Table, now: i96, idle_ns: u64) void {
-    if (draining_now == 0) return;
-    for (&draining, 0..) |*slot, i| {
-        const d = if (slot.*) |*d| d else continue;
-        const c = &table.conns[i];
-        var done = false;
-        if (c.state != .established) {
-            done = true;
-        } else {
-            if (d.spill.push(table, i) > 0 or c.una != d.una) {
-                d.since = now;
-                d.una = c.una;
-            }
-            if (d.spill.pending().len == 0) {
-                close(wire, table, i);
-                done = true;
-            } else if (now - d.since >= idle_ns) {
-                table.abandon(wire, i, .slow_client);
-                serial.put("  let go: the client stopped taking the response\n");
-                done = true;
-            }
-        }
-        if (done) {
-            d.spill.deinit();
-            table.release(i);
-            slot.* = null;
-            draining_now -= 1;
-        }
-    }
-}
-
 /// What a turn of the held streams needs, set once the network is up.
 pub var turning: ?struct { wire: *stream.Wire, table: *tcp.Table, hub: *Hub, conf: Config, scratch: std.heap.FixedBufferAllocator } = null;
 /// The streams' own scratch: a turn can come in the middle of a request, whose
 /// heap is not the streams' to reset. Big enough for the largest frame chat
 /// renders, several times over.
 const stream_scratch_bytes = 4 * 1024 * 1024;
-var in_turn = false;
-
-/// Called by every turn of the network (`stream.after_arrivals`). A turn does
-/// not start another: ending a stream never waits, but it is simpler to know
-/// that than to prove it each time.
-fn streamTurn() void {
-    const t = if (turning) |*t| t else return;
-    if (in_turn) return;
-    in_turn = true;
-    defer in_turn = false;
-    const now = Io.awakeNs() orelse 0;
-    fetchStep(t.table, t.wire, now);
-    serviceStreams(t.wire, t.table, t.hub, t.scratch.allocator(), now, t.conf);
-    t.scratch.reset();
-    serviceDraining(t.wire, t.table, now, t.conf.idle_ns);
-}
-
-/// One pass over the held streams: end the ones whose client has gone, queue
-/// what has arrived for the rest, ping the quiet ones. `scratch` holds the
-/// rendered frames for this pass only.
-///
-/// **NOTHING HERE WAITS.** A frame goes into its connection's send queue as far
-/// as there is room, and the rest is carried to the next turn. A stream whose
-/// carry has not moved for the idle time is ended: its tab is not reading, and
-/// its browser will reconnect and resume. So is one whose mailbox overflowed —
-/// a stream with a gap in it is worse than one that starts again.
-fn serviceStreams(wire: *stream.Wire, table: *tcp.Table, hub: *Hub, scratch: std.mem.Allocator, now: i96, conf: Config) void {
-    // A frame shows others what was just saved: the save is durable first,
-    // as for any response (`io.durable`). These frames, and the keepalive
-    // ping below, are queued here, not through a Stream, so this one call
-    // covers all three of this function's queues.
-    Io.durable();
-    for (&held) |*slot| {
-        const h = if (slot.*) |*h| h else continue;
-        const c = &table.conns[h.conn];
-        if (!c.open() or c.peerDone()) {
-            endStream(slot, wire, table, hub, .client_left);
-            continue;
-        }
-        var wrote = false;
-        while (true) {
-            if (h.carry_at < h.carry.len) {
-                const n = table.queue(h.conn, h.carry[h.carry_at..]);
-                h.carry_at += n;
-                wrote = wrote or n > 0;
-                if (h.carry_at < h.carry.len) break;
-                hub.gpa.free(h.carry);
-                h.carry = &.{};
-                h.carry_at = 0;
-            }
-            const next = streams.nextFrame(h.kept, scratch) catch |e| {
-                endStream(slot, wire, table, hub, if (e == error.EventsMissed) .missed_events else .no_room_to_render);
-                break;
-            };
-            const frame = next orelse break;
-            const n = table.queue(h.conn, frame);
-            wrote = wrote or n > 0;
-            if (n == frame.len) continue;
-            h.carry = hub.gpa.dupe(u8, frame[n..]) catch {
-                endStream(slot, wire, table, hub, .no_room_to_render);
-                break;
-            };
-        }
-        const still = if (slot.*) |*left| left else continue;
-        if (wrote) still.last_write = now;
-        if (still.carry.len == 0) {
-            still.stuck_since = null;
-            if (!wrote and now - still.last_write >= conf.keepalive_ns and c.queueRoom() >= streams.ping.len) {
-                _ = table.queue(still.conn, streams.ping);
-                still.last_write = now;
-            }
-            continue;
-        }
-        if (still.stuck_since == null or c.una != still.stuck_una or wrote) {
-            still.stuck_since = now;
-            still.stuck_una = c.una;
-        } else if (now - still.stuck_since.? >= conf.idle_ns) {
-            endStream(slot, wire, table, hub, .lagging);
-        }
-    }
-}
-
 /// Whether any connection is still saying goodbye.
 fn closing(table: *tcp.Table) bool {
     for (table.conns) |c| {
@@ -1382,7 +1269,7 @@ fn oldestHeld(table: *tcp.Table) ?*?Held {
 /// whatever the stream still had on its way, and the table finishes the close
 /// on later turns (or gives up on a peer that stops answering); a closing
 /// connection is not handed to anyone else meanwhile.
-fn endStream(slot: *?Held, wire: *stream.Wire, table: *tcp.Table, hub: *Hub, ending: Ending) void {
+pub fn endStream(slot: *?Held, wire: *stream.Wire, table: *tcp.Table, hub: *Hub, ending: Ending) void {
     const h = slot.*.?;
     streams.drop(hub, h.kept);
     if (h.carry.len > 0) hub.gpa.free(h.carry);
@@ -1441,7 +1328,7 @@ fn reportStack(deepest: usize) usize {
 ///
 /// The FIN goes on the wire now rather than on the next turn of the network,
 /// which comes after the request's log is written.
-fn close(wire: *stream.Wire, table: *tcp.Table, i: usize) void {
+pub fn close(wire: *stream.Wire, table: *tcp.Table, i: usize) void {
     table.finish(i);
     if (table.conns[i].state != .closing) return table.abandon(wire, i, .unfinished);
     const now = Io.awakeNs() orelse 0;
@@ -1650,13 +1537,13 @@ const Fetching = struct {
         self.body_len += n;
     }
 
-    fn end(self: *Fetching, outcome: webbox.host_fetch.Outcome, status: u16) void {
+    pub fn end(self: *Fetching, outcome: webbox.host_fetch.Outcome, status: u16) void {
         self.client = null;
         self.ended = .{ .outcome = outcome, .status = status, .body = self.kept[0..self.body_len] };
         self.news = true;
     }
 };
-var fetching: Fetching = .{};
+pub var fetching: Fetching = .{};
 
 fn fetchStart(target: webbox.host_fetch.Target, d: webbox.host_fetch.Deadlines) webbox.host_fetch.StartError!void {
     // One at a time, and an end is handed over before the next begins.
@@ -1691,30 +1578,6 @@ fn fetchResult() ?webbox.host_fetch.Result {
 
 fn fetchLearned(p: metal.arp.Packet) void {
     if (fetching.client) |*c| c.learned(p);
-}
-
-/// One step of the application's fetch, if one runs: on every turn of the
-/// network (`streamTurn`), the turns inside a serve included, so a long serve
-/// holds up its request and its reading no more than any connection's, and
-/// its deadlines never run out on a fetch nobody stepped.
-fn fetchStep(table: *tcp.Table, wire: *stream.Wire, now: i96) void {
-    const c = if (fetching.client) |*c| c else return;
-    // Past what is kept, the rest is not read: the connection is let go,
-    // and the next step says how it ended (too_long, below).
-    if (fetching.too_long) if (c.slot) |i| if (table.conns[i].state != .closed) table.abandon(wire, i, .unfinished);
-    const o = c.step(table, wire, now, &fetching) orelse return;
-    const status = c.answer.status;
-    fetching.end(if (fetching.too_long) .too_long else hostOutcome(o), status);
-}
-
-/// The kernel's client's word, as webbox says it: every one has its twin.
-fn hostOutcome(o: metal.fetch.Outcome) webbox.host_fetch.Outcome {
-    comptime for (std.enums.values(metal.fetch.Outcome)) |k| {
-        if (!@hasField(webbox.host_fetch.Outcome, @tagName(k))) @compileError("webbox's host_fetch has no outcome " ++ @tagName(k));
-    };
-    return switch (o) {
-        inline else => |k| @field(webbox.host_fetch.Outcome, @tagName(k)),
-    };
 }
 
 /// An application's line (webbox's `host_facts.say`), on the console with
