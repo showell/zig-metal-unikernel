@@ -1095,6 +1095,60 @@ pub const Table = struct {
         }
     }
 
+    /// Whether a timeout owes a shut window its one-byte probe.
+    const Probe = enum { none, owed };
+
+    /// **WHAT THE WINDOW TAKES, SENT** (`transmitOne`, after its timers): the
+    /// queued bytes, a segment size at a time, within the peer's window and,
+    /// recovering, the recovery cap; a shut window, its one-byte probe when a
+    /// timeout owes one (`probe`). Each send keeps the retransmission timer
+    /// running, and a first send is timed.
+    fn sendWhatFits(self: *Table, wire: anytype, i: usize, now: i96, probe: Probe) void {
+        const c = &self.conns[i];
+        var p = probe;
+        while (c.queued() > c.sent) {
+            // While recovering, nothing past `una + recovery`: checked before
+            // the window rule, so a cap reached is never taken for a shut
+            // window and probed past.
+            if (c.recovery) |cap| if (c.sent >= cap) break;
+            const usable = if (c.wnd > c.sent) c.wnd - c.sent else 0;
+            var n = @min(c.queued() - c.sent, usable, c.mss);
+            if (c.recovery) |cap| n = @min(n, cap - c.sent);
+            if (n == 0) {
+                // **A SHUT WINDOW IS PROBED WHEN THE TIMER RUNS OUT** (RFC
+                // 9293 §3.8.6.1), with one byte; the answer carries the window.
+                if (p == .none) {
+                    if (c.rto_at == null) c.rto_at = now + c.rto_ns;
+                    break;
+                }
+                self.probes += 1;
+                props.reachable(@src(), "tcp: a shut window is probed", .{ .conn = i });
+                // **A PROBE IS A QUESTION, NOT A SEND** (metal-vmm QUEUE
+                // 227): its byte is `high`'s, so an ACK that takes it counts,
+                // but not `sent`'s, since a shut window takes nothing. RFC
+                // 9293 §3.4:
+                // > Note that when the receive window is zero no segments should be
+                // > acceptable except ACK segments.
+                // Counted as sent, a refused probe left a hole at `una` when
+                // the window opened. It is never timed: its byte goes again,
+                // in the probe after it or the segment that follows the
+                // opening (Karn).
+                const seq = c.una +% @as(u32, @intCast(c.sent));
+                self.emit(wire, i, flag_psh | flag_ack, seq, c.tx[c.tx_start + c.sent ..][0..1]);
+                c.high = @max(c.high, c.sent + 1);
+                if (c.rto_at == null) c.rto_at = now + c.rto_ns;
+                break;
+            }
+            p = .none;
+            const first_time = c.sent + n > c.high;
+            self.emit(wire, i, flag_psh | flag_ack, c.una +% @as(u32, @intCast(c.sent)), c.tx[c.tx_start + c.sent ..][0..n]);
+            c.sent += n;
+            if (first_time) c.time(now, c.una +% @as(u32, @intCast(c.sent)));
+            c.high = @max(c.high, c.sent);
+            if (c.rto_at == null) c.rto_at = now + c.rto_ns;
+        }
+    }
+
     fn transmitOne(self: *Table, wire: anytype, i: usize, now: i96) void {
         // A connection of our own past a deadline sends nothing more.
         if (pastDeadline(&self.conns[i], now)) |which| {
@@ -1141,7 +1195,7 @@ pub const Table = struct {
         }
 
         // A timeout owes the window one probe, if it is shut: one byte.
-        var probe: enum { none, owed } = .none;
+        var probe: Probe = .none;
         if (expired) {
             if (!timeouts.backoff(c, now)) return self.giveUp(wire, i);
             // **THE OLDEST SEGMENT AGAIN** (RFC 6298 (5.4): "Retransmit the
@@ -1169,47 +1223,7 @@ pub const Table = struct {
             };
         }
 
-        while (c.queued() > c.sent) {
-            // While recovering, nothing past `una + recovery`: checked before
-            // the window rule, so a cap reached is never taken for a shut
-            // window and probed past.
-            if (c.recovery) |cap| if (c.sent >= cap) break;
-            const usable = if (c.wnd > c.sent) c.wnd - c.sent else 0;
-            var n = @min(c.queued() - c.sent, usable, c.mss);
-            if (c.recovery) |cap| n = @min(n, cap - c.sent);
-            if (n == 0) {
-                // **A SHUT WINDOW IS PROBED WHEN THE TIMER RUNS OUT** (RFC
-                // 9293 §3.8.6.1), with one byte; the answer carries the window.
-                if (probe == .none) {
-                    if (c.rto_at == null) c.rto_at = now + c.rto_ns;
-                    break;
-                }
-                self.probes += 1;
-                props.reachable(@src(), "tcp: a shut window is probed", .{ .conn = i });
-                // **A PROBE IS A QUESTION, NOT A SEND** (metal-vmm QUEUE
-                // 227): its byte is `high`'s, so an ACK that takes it counts,
-                // but not `sent`'s, since a shut window takes nothing. RFC
-                // 9293 §3.4:
-                // > Note that when the receive window is zero no segments should be
-                // > acceptable except ACK segments.
-                // Counted as sent, a refused probe left a hole at `una` when
-                // the window opened. It is never timed: its byte goes again,
-                // in the probe after it or the segment that follows the
-                // opening (Karn).
-                const seq = c.una +% @as(u32, @intCast(c.sent));
-                self.emit(wire, i, flag_psh | flag_ack, seq, c.tx[c.tx_start + c.sent ..][0..1]);
-                c.high = @max(c.high, c.sent + 1);
-                if (c.rto_at == null) c.rto_at = now + c.rto_ns;
-                break;
-            }
-            probe = .none;
-            const first_time = c.sent + n > c.high;
-            self.emit(wire, i, flag_psh | flag_ack, c.una +% @as(u32, @intCast(c.sent)), c.tx[c.tx_start + c.sent ..][0..n]);
-            c.sent += n;
-            if (first_time) c.time(now, c.una +% @as(u32, @intCast(c.sent)));
-            c.high = @max(c.high, c.sent);
-            if (c.rto_at == null) c.rto_at = now + c.rto_ns;
-        }
+        self.sendWhatFits(wire, i, now, probe);
 
         if (c.fin.in(.owed) and c.sent == c.queued()) {
             self.emit(wire, i, flag_fin | flag_ack, c.una +% @as(u32, @intCast(c.sent)), "");
