@@ -168,12 +168,15 @@ pub fn Drains(comptime Rule: type, comptime conns: usize) type {
         /// **A BODY IN MEMORY BEFORE THE TURN**: the request's head and its
         /// body as they came, drained from the connection's buffer.
         pub const Drain = struct {
+            /// How a body ends: at its Content-Length, or at its last chunk.
+            pub const Framing = enum { length, chunked };
+
             bytes: []u8,
             len: usize = 0,
             head_len: usize,
             /// A Content-Length body is whole at `head_len + want` bytes; a
             /// chunked one when its last chunk is in.
-            framing: enum { length, chunked },
+            framing: Framing,
             want: usize,
             /// The most it may hold, head and body.
             most: usize,
@@ -374,7 +377,7 @@ pub fn Drains(comptime Rule: type, comptime conns: usize) type {
                 .drain => {
                     const since = startWait(w, &w.head_at, now, got.wait_ms);
                     const parsed = std.http.Server.Request.Head.parse(c.pending[0..got.head_len]) catch return .{ .then = .serve };
-                    switch (self.begin(i, got.head_len, got.read.?, parsed.transfer_encoding == .chunked, self.limit(parsed.target), false, now, since + msNs(got.wait_ms))) {
+                    switch (self.begin(i, got.head_len, got.read.?, framingOf(parsed), self.limit(parsed.target), .small, now, since + msNs(got.wait_ms))) {
                         .begun => {},
                         // **A FULL BUDGET IS A 503, AT ONCE** (175.2), as Linux
                         // answers it (body.zig's small_budget): a wait ran to
@@ -448,7 +451,7 @@ pub fn Drains(comptime Rule: type, comptime conns: usize) type {
             if (parsed.expect) |e| if (!w.continued and std.ascii.eqlIgnoreCase(e, "100-continue")) return .{ .then = .send_continue };
             // Its five minutes from its slot, and what turns may add to them.
             if (w.drain == null) w.credit_left = msNs(read.deadline_ms);
-            switch (self.begin(i, head_len, read, parsed.transfer_encoding == .chunked, self.limit(parsed.target), true, now, now + msNs(read.deadline_ms))) {
+            switch (self.begin(i, head_len, read, framingOf(parsed), self.limit(parsed.target), .upload, now, now + msNs(read.deadline_ms))) {
                 .begun => {},
                 .over_budget => unreachable, // an upload has its slot, and no budget
                 .no_memory => {
@@ -461,9 +464,22 @@ pub fn Drains(comptime Rule: type, comptime conns: usize) type {
 
         const Begun = enum { begun, over_budget, no_memory };
 
-        fn begin(self: *Self, i: usize, head_len: usize, read: Rule.Read, chunked: bool, cap: u64, is_upload: bool, now: i96, deadline_at: i96) Begun {
+        /// What a drain holds: a small body, charged to the small budget as it
+        /// grows, or an upload, its exact length at once in its own slot.
+        const Body = enum { small, upload };
+
+        /// How a request's head says its body ends.
+        fn framingOf(head: std.http.Server.Request.Head) Drain.Framing {
+            return if (head.transfer_encoding == .chunked) .chunked else .length;
+        }
+
+        fn begin(self: *Self, i: usize, head_len: usize, read: Rule.Read, framing: Drain.Framing, cap: u64, body: Body, now: i96, deadline_at: i96) Begun {
             const w = &self.waits[i];
-            const body_most: u64 = if (chunked) Rule.chunkedRawMost(cap) else read.bytes;
+            const is_upload = body == .upload;
+            const body_most: u64 = switch (framing) {
+                .chunked => Rule.chunkedRawMost(cap),
+                .length => read.bytes,
+            };
             const most = std.math.add(u64, head_len, body_most) catch return .no_memory;
             if (most > std.math.maxInt(usize)) return .no_memory;
             // An upload's exact length at once: its slot is its bound. A small
@@ -475,7 +491,7 @@ pub fn Drains(comptime Rule: type, comptime conns: usize) type {
             w.drain = .{
                 .bytes = bytes,
                 .head_len = head_len,
-                .framing = if (chunked) .chunked else .length,
+                .framing = framing,
                 .want = @intCast(read.bytes),
                 .most = @intCast(most),
                 .began = now,
