@@ -190,7 +190,7 @@ Two smaller things:
 ### 10. Sector numbers are 32 bits
 
 `start_lba`, `fat_start`, `data_start` and `clusterSector`'s result are all
-`u32` sectors. With 512-byte sectors that is 2 TiB. `virtio.Block.read`
+`u32` sectors. With 512-byte sectors that is 2 TiB. `virtio_blk.Block.read`
 already takes a `u64` LBA, and DigitalOcean volumes go to 16 TiB.
 
 **Recommendation: refuse at mount a volume that extends past sector 2^32,
@@ -294,7 +294,7 @@ care which FAT is under it.
 - the high/low cluster encoding;
 - 28-bit entry get/set with reserved bits kept.
 
-`mount` takes a `*virtio.Block`, so these want the layout arithmetic pulled
+`mount` takes a `*virtio_blk.Block`, so these want the layout arithmetic pulled
 out into a function over a 512-byte array. That is a small refactor that
 also makes the "a boot sector is not trusted" checks testable.
 

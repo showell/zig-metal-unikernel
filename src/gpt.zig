@@ -16,7 +16,7 @@
 
 const std = @import("std");
 const props = @import("coverage");
-const virtio = @import("virtio.zig");
+const virtio_blk = @import("virtio_blk.zig");
 
 comptime {
     props.catalogFile(@import("coverage_catalog"), here());
@@ -61,8 +61,8 @@ fn le64(b: []const u8) u64 {
 
 /// The first partition in the table that is not the kernel's, or an error.
 /// `scratch` is one sector of identity-mapped memory the device writes into.
-pub fn dataPartition(blk: *virtio.Block, scratch: *[sector_size]u8) Error!Partition {
-    if (blk.read(header_lba, @intFromPtr(scratch)) != virtio.blk_s_ok) {
+pub fn dataPartition(blk: *virtio_blk.Block, scratch: *[sector_size]u8) Error!Partition {
+    if (blk.read(header_lba, @intFromPtr(scratch)) != virtio_blk.blk_s_ok) {
         props.reachable(@src(), "gpt: the header cannot be read", null);
         return Error.ReadFailed;
     }
@@ -93,7 +93,7 @@ pub fn dataPartition(blk: *virtio.Block, scratch: *[sector_size]u8) Error!Partit
     while (index < entry_count) : (index += 1) {
         const lba: u32 = @intCast(entries_lba + index / per_sector);
         if (index % per_sector == 0) {
-            if (blk.read(lba, @intFromPtr(scratch)) != virtio.blk_s_ok) {
+            if (blk.read(lba, @intFromPtr(scratch)) != virtio_blk.blk_s_ok) {
                 props.reachable(@src(), "gpt: a sector of entries cannot be read", .{ .lba = lba });
                 return Error.ReadFailed;
             }
@@ -133,7 +133,7 @@ pub fn dataPartition(blk: *virtio.Block, scratch: *[sector_size]u8) Error!Partit
 
 /// A disk of eight sectors: a GPT header at 1 naming `entries_lba`, and one
 /// partition entry at sector 2 from `first` to `last`.
-fn testDisk(bytes: *[8 * sector_size]u8, entries_lba: u64, first: u64, last: u64) virtio.Block {
+fn testDisk(bytes: *[8 * sector_size]u8, entries_lba: u64, first: u64, last: u64) virtio_blk.Block {
     @memset(bytes, 0);
     const h = bytes[sector_size..][0..sector_size];
     @memcpy(h[0..8], signature);
@@ -144,7 +144,7 @@ fn testDisk(bytes: *[8 * sector_size]u8, entries_lba: u64, first: u64, last: u64
     e[0] = 0xAF; // any type but the kernel's
     std.mem.writeInt(u64, e[32..40], first, .little);
     std.mem.writeInt(u64, e[40..48], last, .little);
-    return virtio.Block.inMemory(bytes);
+    return virtio_blk.Block.inMemory(bytes);
 }
 
 test "a GPT whose entries are past sector 2^32 is not one this machine reads (metal-vmm QUEUE 182.1)" {

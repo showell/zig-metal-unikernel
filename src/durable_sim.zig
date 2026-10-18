@@ -1,5 +1,5 @@
 //! **NOTHING LEAVES AHEAD OF THE WRITES BEFORE IT, UNDER A SEED** (metal-vmm
-//! QUEUE.md item 59). `durable.zig` is the decision `virtio.Block.flush`
+//! QUEUE.md item 59). `durable.zig` is the decision `virtio_blk.Block.flush`
 //! makes; this drives it as `io.durable` does, over every interleaving a
 //! seed draws, against what each disk truly does.
 //!

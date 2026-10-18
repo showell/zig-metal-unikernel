@@ -6,7 +6,7 @@
 
 const disk_fat = @import("disk_fat.zig");
 const PageCache = @import("page_cache.zig").PageCache;
-const virtio = @import("virtio.zig");
+const virtio_blk = @import("virtio_blk.zig");
 const props = @import("coverage");
 const serial = @import("serial.zig");
 const std = @import("std");
@@ -59,7 +59,7 @@ pub fn pagesFor(path: []const u8) ?*PageCache {
 
 /// **NOTHING LEAVES THE MACHINE AHEAD OF THE WRITES BEFORE IT.** Every
 /// disk with writes it has answered but may not have kept is flushed
-/// (`virtio.Block.flush`). `stream.zig` calls this before any response byte
+/// (`virtio_blk.Block.flush`). `stream.zig` calls this before any response byte
 /// joins a connection's send queue, so a 303 that says a message was saved,
 /// or a chat frame that shows it to others, goes out only once the message
 /// is durable. This is external synchrony (Nightingale et al., "Rethink the
@@ -88,7 +88,7 @@ pub fn durableChecked() bool {
     for ([_]?disk_fat.Volume{ site, data }, 0..) |maybe, k| {
         const v = maybe orelse continue;
         if (!v.blk.unflushed) continue;
-        if (v.blk.flush() != virtio.blk_s_ok) {
+        if (v.blk.flush() != virtio_blk.blk_s_ok) {
             // Reached under metal-vmm with VOLUME_SYNC_FAIL=1 (the volume);
             // no knob fails a flush of the boot disk, which is virtio-blk
             // and writes through.

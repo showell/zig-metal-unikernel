@@ -3,7 +3,7 @@
 //! simulator reaches, each built field by field with one field made wrong,
 //! rather than from random bytes, so every refusal is met on purpose.
 //!
-//! - **GPT** (`gptSeed`): a disk in memory (`virtio.Block.inMemory`) with a
+//! - **GPT** (`gptSeed`): a disk in memory (`virtio_blk.Block.inMemory`) with a
 //!   protective MBR, a header and a table of entries, the data partition
 //!   among unused slots and perhaps behind the kernel's own. Then one thing
 //!   wrong, or nothing: the signature, the entry count or size, a read that
@@ -67,7 +67,7 @@
 
 const std = @import("std");
 const ev = @import("sim_events.zig");
-const virtio = @import("virtio.zig");
+const virtio_blk = @import("virtio_blk.zig");
 const gpt = @import("gpt.zig");
 const kernel_partition = @import("kernel_partition.zig");
 const PageCache = @import("page_cache.zig").PageCache;
@@ -171,7 +171,7 @@ pub fn gptSeed(seed: u64) Failure!void {
             }
         }
     }
-    var blk = virtio.Block.inMemory(&disk);
+    var blk = virtio_blk.Block.inMemory(&disk);
     if (wrong == .header_unread) blk.fail_after = 0;
     if (wrong == .table_unread) blk.fail_after = 1;
     var scratch: [512]u8 = undefined;

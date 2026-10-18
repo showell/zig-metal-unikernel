@@ -1,4 +1,4 @@
-//! `disk_fat.zig` on a disk in memory (`virtio.Block.inMemory`): mount, write,
+//! `disk_fat.zig` on a disk in memory (`virtio_blk.Block.inMemory`): mount, write,
 //! read back, append, remove, fill the disk, and damage it on purpose, all
 //! on the host.
 //!
@@ -15,7 +15,7 @@
 const std = @import("std");
 const disk_fat = @import("disk_fat.zig");
 const options = @import("disk_fat_test_options");
-const virtio = @import("virtio.zig");
+const virtio_blk = @import("virtio_blk.zig");
 const test_disk = @import("test_disk.zig");
 const testing = std.testing;
 const Shape = test_disk.Shape;
@@ -479,7 +479,7 @@ test "a FAT too short for the clusters it describes is refused at mount" {
     defer testing.allocator.free(bytes);
     test_disk.format(bytes, small);
     std.mem.writeInt(u16, bytes[22..24], 2, .little); // room for 510 clusters of ~8,000
-    var blk = @import("virtio.zig").Block.inMemory(bytes);
+    var blk = @import("virtio_blk.zig").Block.inMemory(bytes);
     var scratch: [test_disk.sector]u8 align(16) = undefined;
     try testing.expectError(disk_fat.Error.BadBootSector, disk_fat.Volume.mount(&blk, &scratch, 0));
 }
@@ -977,7 +977,7 @@ test "a volume mkfs.vfat and mtools made: the check's verdict is the oracle's" {
         if (!std.mem.endsWith(u8, file.name, ".img")) continue;
         const bytes = try dir.readFileAlloc(io, file.name, testing.allocator, .limited(64 << 20));
         defer testing.allocator.free(bytes);
-        var blk = virtio.Block.inMemory(bytes);
+        var blk = virtio_blk.Block.inMemory(bytes);
         var scratch: [test_disk.sector]u8 align(16) = undefined;
         const healthy = std.mem.startsWith(u8, file.name, "healthy-");
         // A volume this machine refuses at mount (FAT32 mirroring off, a

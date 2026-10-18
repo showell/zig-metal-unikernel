@@ -132,7 +132,7 @@ pub const FatStore = struct {
         const temp = join(parts, store.temp_prefix, &tb);
         f.vol.writeFile(temp, bytes) catch |err| return map(err, true);
         // The new bytes on the media before the name that points at them.
-        if (f.vol.blk.flush() != @import("virtio.zig").blk_s_ok) return Error.Io;
+        if (f.vol.blk.flush() != @import("virtio_blk.zig").blk_s_ok) return Error.Io;
         f.vol.rename(temp, p) catch |err| {
             f.vol.remove(temp) catch {};
             return map(err, true);

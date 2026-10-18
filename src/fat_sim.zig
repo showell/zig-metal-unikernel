@@ -261,7 +261,7 @@ const Sim = struct {
     /// The disk's most for the run of `seed` (`Scenario.most_sectors`).
     fn mostOf(seed: u64, shape: test_disk.Shape) u32 {
         var side = std.Random.DefaultPrng.init(seed ^ 0x6d6f_7374_7365_6374); // "mostsect"
-        const choices = [_]u32{ shape.sectors_per_cluster, 8, 128, @import("virtio.zig").Block.most_sectors_ours };
+        const choices = [_]u32{ shape.sectors_per_cluster, 8, 128, @import("virtio_blk.zig").Block.most_sectors_ours };
         return choices[side.random().uintLessThan(usize, choices.len)];
     }
 

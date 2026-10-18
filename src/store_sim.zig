@@ -126,7 +126,7 @@ const World = struct {
 
     /// The disk flushed, as before a response.
     fn flush(w: *World, step: usize) !void {
-        if (w.disk.blk.flush() != @import("virtio.zig").blk_s_ok) return fail(w.seed, "step {d}: a flush failed with the power on", .{step});
+        if (w.disk.blk.flush() != @import("virtio_blk.zig").blk_s_ok) return fail(w.seed, "step {d}: a flush failed with the power on", .{step});
         if (w.cache.?.pending() != 0) return fail(w.seed, "step {d}: a flush left writes waiting", .{step});
     }
 

@@ -1,5 +1,5 @@
 //! **WHAT A DISK NEEDS BEFORE OUTPUT LEAVES THE MACHINE** (metal-vmm QUEUE
-//! item 59): the decision `virtio.Block.flush` makes, pulled out of the I/O
+//! item 59): the decision `virtio_blk.Block.flush` makes, pulled out of the I/O
 //! it does, so `durable_sim.zig` can drive it over any interleaving of
 //! writes, responses and flush outcomes. The I/O stays behind in `Block`:
 //! `scsi.synchronize` is called only when `step` says so.

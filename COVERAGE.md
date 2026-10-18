@@ -273,7 +273,7 @@ metal-vmm run in `long.sh`; once a run reaches it, it goes on
 
 | property | module | knob |
 |---|---|---|
-| virtio: a flush fails, is counted, and the disk stays unflushed | `virtio.zig` | `VOLUME=<copy> VOLUME_CACHE=1 VOLUME_SYNC_FAIL=1`, and a chat post |
+| virtio: a flush fails, is counted, and the disk stays unflushed | `virtio_blk.zig` | `VOLUME=<copy> VOLUME_CACHE=1 VOLUME_SYNC_FAIL=1`, and a chat post |
 | (no property) The Store's `replace` flushes before it renames | `store_fat.zig` | `VOLUME=<copy> VOLUME_CACHE=1 VOLUME_CUT_AT_EXIT=1` around a `replace`: in memory a flush does nothing, so only a write cache shows that the rename cannot reach the media before the data. Needs a kernel that calls the Store, which none does yet |
 | stream: a read finds the peer closed or done, so nothing more is coming | `stream.zig` | `PEER_RESET_AT=<before the request ends>` (unverified) |
 | stream: a read waits idle_ns for a byte, and gives up | `stream.zig` | `PEER_DRIP_US=11000000` with a request of several segments (`PEER_MSS`), each later than `idle_ns` (10 s) (unverified) |

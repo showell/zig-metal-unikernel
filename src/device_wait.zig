@@ -10,7 +10,7 @@
 //!   - **timed_out**: the budget passed with no answer.
 //!
 //! The driver keeps the I/O: reading the clock and the status, and what it
-//! does with a request that never ended (`virtio.Block` refuses every later
+//! does with a request that never ended (`virtio_blk.Block` refuses every later
 //! request: the device still holds the abandoned one's buffers).
 
 const std = @import("std");

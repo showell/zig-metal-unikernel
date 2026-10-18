@@ -5,6 +5,7 @@
 
 const metal = @import("metal");
 const virtio = metal.virtio;
+const virtio_blk = metal.virtio_blk;
 const serial = metal.serial;
 const scsi = metal.scsi;
 const disk_fat = metal.disk_fat;
@@ -17,7 +18,7 @@ const webbox = @import("webbox");
 const gopher = @import("gopher.zig");
 
 /// The disk the machine was booted from, which holds the site.
-pub fn bootDisk() virtio.Block {
+pub fn bootDisk() virtio_blk.Block {
     const base = virtio.find(virtio.device_id_block) orelse
         serial.fail("no disk: this kernel serves the site from a FAT16 volume");
     return gopher.blk_mem.bring(base) catch serial.fail("the block device would not come up");
@@ -28,7 +29,7 @@ pub fn bootDisk() virtio.Block {
 /// ordinary and said. A controller or a disk that will not work stops the
 /// machine instead of quietly keeping the data on the boot disk, where the
 /// next image would erase it.
-pub fn dataVolume() ?virtio.Block {
+pub fn dataVolume() ?virtio_blk.Block {
     const controller = virtio.find(scsi.device_id) orelse return null;
     if (scsi.bring(controller, &gopher.volume_mem)) |b| {
         const at = b.address.?;
@@ -80,7 +81,7 @@ const fat_budget_bytes: usize = 32 << 20;
 /// that refused once answers the next time. Serving, a read is tried once.
 pub const boot_read_tries: u8 = 3;
 
-pub fn mountFat(blk: *virtio.Block, scratch: *[disk_fat.sector_size]u8, what: []const u8) disk_fat.Volume {
+pub fn mountFat(blk: *virtio_blk.Block, scratch: *[disk_fat.sector_size]u8, what: []const u8) disk_fat.Volume {
     // A table that cannot be read is a disk failing, not a blank one: the
     // two are told apart.
     const part = gpt.dataPartition(blk, scratch) catch |e| {

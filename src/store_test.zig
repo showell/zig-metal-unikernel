@@ -330,7 +330,7 @@ test "replace: its flush puts the new bytes on the media before the name that po
     const old = "the old file, " ** 120;
     const new = "the whole new file, " ** 150;
     try f.store_().write("f.md", old);
-    try testing.expectEqual(@import("virtio.zig").blk_s_ok, d.blk.flush());
+    try testing.expectEqual(@import("virtio_blk.zig").blk_s_ok, d.blk.flush());
     try f.store_().replace("f.md", new);
     try testing.expect(c.pending() > 0);
     const l = test_disk.Layout.of(d.bytes);

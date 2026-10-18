@@ -3,7 +3,7 @@
 
 const std = @import("std");
 const disk_fat = @import("disk_fat.zig");
-const virtio = @import("virtio.zig");
+const virtio_blk = @import("virtio_blk.zig");
 const test_disk = @import("test_disk.zig");
 const testing = std.testing;
 const Shape = test_disk.Shape;
@@ -137,7 +137,7 @@ test "FAT32: FSInfo's free count and hint are marked unknown on the first write,
 test "FAT32: a volume this machine cannot write safely is refused at mount, each with its own error" {
     const bytes = try testing.allocator.alloc(u8, test_disk.small32.sectors * test_disk.sector);
     defer testing.allocator.free(bytes);
-    var blk = virtio.Block.inMemory(bytes);
+    var blk = virtio_blk.Block.inMemory(bytes);
     var scratch: [test_disk.sector]u8 align(16) = undefined;
     const Case = struct { what: []const u8, offset: usize, value: u32, size: u8, want: disk_fat.Error };
     const cases = [_]Case{
@@ -178,7 +178,7 @@ test "FAT32: a volume this machine cannot write safely is refused at mount, each
 test "FAT16: a boot sector this machine cannot trust is refused at mount, each with its own error" {
     const bytes = try testing.allocator.alloc(u8, test_disk.small.sectors * test_disk.sector);
     defer testing.allocator.free(bytes);
-    var blk = virtio.Block.inMemory(bytes);
+    var blk = virtio_blk.Block.inMemory(bytes);
     var scratch: [test_disk.sector]u8 align(16) = undefined;
     // Where the data begins on the volume test_disk.small makes, from its
     // own fields, so a total just past it, or short of it, can be written.
@@ -541,19 +541,19 @@ test "a device whose request is smaller than a cluster is refused at mount, neve
 }
 
 test "a request's most is ours, 1 MiB, or less where the device says less, never more (metal-vmm QUEUE 178)" {
-    try testing.expectEqual(@as(u32, 2048), virtio.Block.mostSectors(null));
-    try testing.expectEqual(@as(u32, 2048), virtio.Block.mostSectors(1 << 20));
-    try testing.expectEqual(@as(u32, 2048), virtio.Block.mostSectors((1 << 20) + 512));
-    try testing.expectEqual(@as(u32, 2047), virtio.Block.mostSectors((1 << 20) - 512));
-    try testing.expectEqual(@as(u32, 1), virtio.Block.mostSectors(1023));
-    try testing.expectEqual(@as(u32, 0), virtio.Block.mostSectors(511));
+    try testing.expectEqual(@as(u32, 2048), virtio_blk.Block.mostSectors(null));
+    try testing.expectEqual(@as(u32, 2048), virtio_blk.Block.mostSectors(1 << 20));
+    try testing.expectEqual(@as(u32, 2048), virtio_blk.Block.mostSectors((1 << 20) + 512));
+    try testing.expectEqual(@as(u32, 2047), virtio_blk.Block.mostSectors((1 << 20) - 512));
+    try testing.expectEqual(@as(u32, 1), virtio_blk.Block.mostSectors(1023));
+    try testing.expectEqual(@as(u32, 0), virtio_blk.Block.mostSectors(511));
 }
 
 // ---- the FAT written as runs, each sector once (metal-vmm QUEUE 179) ----
 
 /// Writes into the FAT's copies, by copy: requests, and the sectors they carry.
 const FatWrites = struct {
-    blk: *virtio.Block,
+    blk: *virtio_blk.Block,
     fat_start: u64,
     per_fat: u64,
     copies: [2]u32 = .{ 0, 0 },
@@ -780,7 +780,7 @@ test "one lie to the first copy's upload-sized FAT run costs nothing: the mount 
     const at = try uploadRunAt();
     const bytes = try uploadBytes();
     defer testing.allocator.free(bytes);
-    for ([_]@FieldType(virtio.Block.Fault, "kind"){ .lands_nothing, .torn, .torn_tail }) |lie| {
+    for ([_]@FieldType(virtio_blk.Block.Fault, "kind"){ .lands_nothing, .torn, .torn_tail }) |lie| {
         const d = try Disk.make("upload-lie", test_disk.small32, true);
         defer d.deinit();
         d.blk.fault = .{ .at = at, .kind = lie };
@@ -840,7 +840,7 @@ test "a FAT run that landed and answered failure is given back as runs, not a cl
 }
 
 test "virtio-blk's size_max is per segment: a request carries it times the segments, and 0 is unset (metal-vmm QUEUE 180.2)" {
-    const most = virtio.Block.mostSectorsBlk;
+    const most = virtio_blk.Block.mostSectorsBlk;
     // Unset, or 0: ours.
     try testing.expectEqual(@as(u32, 2048), most(null, null));
     try testing.expectEqual(@as(u32, 2048), most(0, 8));
@@ -892,20 +892,20 @@ test "a FAT longer than 32-bit entry numbers reach is refused at mount, in the d
 }
 
 test "a virtio-blk request that would need more segments than its chain holds is refused, never built past the ring (metal-vmm QUEUE 187.2)" {
-    const n = virtio.Block.segmentsFor;
+    const n = virtio_blk.Block.segmentsFor;
     try testing.expectEqual(@as(u32, 1), n(512, null));
     try testing.expectEqual(@as(u32, 1), n(512, 512));
     try testing.expectEqual(@as(u32, 6), n(512, 86));
     try testing.expectEqual(@as(u32, 7), n(512, 85));
     try testing.expectEqual(@as(u32, 2), n(4096, 4095));
-    try testing.expect(n(512, 85) > virtio.Block.most_segments);
+    try testing.expect(n(512, 85) > virtio_blk.Block.most_segments);
 }
 
 // ---- an overwrite reads its commit back (metal-vmm QUEUE 188.1) ----
 
 /// Request numbers of writes to one sector.
 const SectorWrites = struct {
-    blk: *virtio.Block,
+    blk: *virtio_blk.Block,
     lba: u64,
     at: ?u64 = null,
     fn each(context: *anyopaque, write: bool, lba: u64, _: u32) void {
@@ -956,7 +956,7 @@ test "an overwrite whose commit lands nothing keeps the old file whole, never br
 
 /// The request number of the first read in [lo, hi), from `from` on.
 const CopyReads = struct {
-    blk: *virtio.Block,
+    blk: *virtio_blk.Block,
     lo: u64,
     hi: u64,
     from: u64,

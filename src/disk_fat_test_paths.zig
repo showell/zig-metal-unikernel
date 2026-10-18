@@ -4,7 +4,7 @@
 
 const std = @import("std");
 const disk_fat = @import("disk_fat.zig");
-const virtio = @import("virtio.zig");
+const virtio_blk = @import("virtio_blk.zig");
 const test_disk = @import("test_disk.zig");
 const testing = std.testing;
 const Shape = test_disk.Shape;
@@ -219,7 +219,7 @@ test "what the FAT says afresh, from a held FAT or the disk, is what its first c
 test "a boot sector whose FAT sizes overflow 32 bits, or that cannot be read, is refused at mount" {
     const bytes = try testing.allocator.alloc(u8, test_disk.small32.sectors * test_disk.sector);
     defer testing.allocator.free(bytes);
-    var blk = virtio.Block.inMemory(bytes);
+    var blk = virtio_blk.Block.inMemory(bytes);
     var scratch: [test_disk.sector]u8 align(16) = undefined;
     // FAT32's sectors per FAT (BPB_FATSz32, at 36), as two FATs and the 32
     // reserved sectors before them make it overflow.
@@ -686,7 +686,7 @@ test "a rename whose write fails, refused whole or landed, keeps the file under 
         const r0 = d.blk.requests;
         try d.vol.rename("data/a long old name.txt", "data/a new long name.md");
         const total = d.blk.requests - r0;
-        for ([_]@TypeOf(@as(@import("virtio.zig").Block.Fault, undefined).kind){ .fails, .lands_and_fails }) |kind| {
+        for ([_]@TypeOf(@as(@import("virtio_blk.zig").Block.Fault, undefined).kind){ .fails, .lands_and_fails }) |kind| {
             var failures: u32 = 0;
             var kept_old: u32 = 0;
             var n: u64 = 0;
@@ -742,7 +742,7 @@ test "a rename whose undo is refused too keeps the file under one whole name, or
         var lost: u32 = 0;
         var kept_whole: u32 = 0;
         var n: u64 = 0;
-        const Kind = @TypeOf(@as(@import("virtio.zig").Block.Fault, undefined).kind);
+        const Kind = @TypeOf(@as(@import("virtio_blk.zig").Block.Fault, undefined).kind);
         const cluster_bytes = @as(usize, d.vol.sectors_per_cluster) * test_disk.sector;
         const body_clusters = (body.len + cluster_bytes - 1) / cluster_bytes;
         while (n < total) : (n += 1) for ([_]Kind{ .fails, .lands_and_fails }) |first| {
@@ -976,7 +976,7 @@ test "an entry whose first cluster is max_cluster reads, one at max_cluster + 1 
 test "FAT32: a root at max_cluster mounts, at max_cluster + 1 is refused; at 2 mounts, at 1 is refused" {
     const bytes = try testing.allocator.alloc(u8, test_disk.small32.sectors * test_disk.sector);
     defer testing.allocator.free(bytes);
-    var blk = virtio.Block.inMemory(bytes);
+    var blk = virtio_blk.Block.inMemory(bytes);
     var scratch: [test_disk.sector]u8 align(16) = undefined;
     test_disk.format(bytes, test_disk.small32);
     const max_cluster: u32 = @intCast(Layout.of(bytes).clusters + 1);
@@ -1095,7 +1095,7 @@ test "a write-through disk's clear is not counted as a SYNCHRONIZE sent; a write
     const d = try test_disk.Disk.make("flush-counted", small, false);
     defer d.deinit();
     try d.vol.writeFile("a.txt", "hello");
-    try testing.expectEqual(virtio.blk_s_ok, d.blk.flush());
+    try testing.expectEqual(virtio_blk.blk_s_ok, d.blk.flush());
     try testing.expect(d.blk.flushes > 0);
     // A disk in memory writes through: nothing was sent to it.
     try testing.expectEqual(@as(u64, 0), d.blk.synchronizes_sent);

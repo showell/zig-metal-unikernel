@@ -1,10 +1,10 @@
 //! A FAT16 or FAT32 disk in memory, for host tests: formatted here from Microsoft's
-//! FAT specification (not by `disk_fat.zig`), served by `virtio.Block.inMemory`,
+//! FAT specification (not by `disk_fat.zig`), served by `virtio_blk.Block.inMemory`,
 //! and checked by reading its bytes directly where a check can be. Shared by
 //! `disk_fat_test.zig` and `io_test.zig`.
 
 const std = @import("std");
-const virtio = @import("virtio.zig");
+const virtio_blk = @import("virtio_blk.zig");
 const disk_fat = @import("disk_fat.zig");
 
 const testing = std.testing;
@@ -273,7 +273,7 @@ pub const Disk = struct {
     /// Where `deinit` writes the image; empty: nowhere.
     images_dir: []const u8 = "",
     bytes: []u8,
-    blk: virtio.Block,
+    blk: virtio_blk.Block,
     scratch: [sector]u8 align(16) = undefined,
     fat_cache: ?[]u8 = null,
     /// A cached disk also reads directories in bursts, as the host's do, of
@@ -311,7 +311,7 @@ pub const Disk = struct {
         const bytes = try zeroedDisk(@as(usize, shape.sectors) * sector);
         errdefer freeDisk(bytes);
         formatZeroed(bytes, shape);
-        d.* = .{ .gpa = gpa, .io = io, .label = label, .suffix = shape.suffix, .bytes = bytes, .blk = virtio.Block.inMemory(bytes) };
+        d.* = .{ .gpa = gpa, .io = io, .label = label, .suffix = shape.suffix, .bytes = bytes, .blk = virtio_blk.Block.inMemory(bytes) };
         try d.mount(cached);
         return d;
     }
@@ -647,7 +647,7 @@ pub const Cache = struct {
     /// What survives a cut: the disk as of its last flush.
     kept: []u8,
     waiting: std.ArrayList(Write) = .empty,
-    hook: virtio.Block.Cache = undefined,
+    hook: virtio_blk.Block.Cache = undefined,
 
     pub const Write = struct { lba: u64, bytes: []u8 };
 
@@ -747,11 +747,11 @@ test "a write cache: a flush keeps, a cut drops what waits, and keeps what it is
     var one: [sector]u8 align(16) = @splat(1);
     var two: [sector]u8 align(16) = @splat(2);
     const at = d.bytes.len / sector - 2;
-    try testing.expectEqual(virtio.blk_s_ok, d.blk.write(at, @intFromPtr(&one)));
-    try testing.expectEqual(virtio.blk_s_ok, d.blk.flush());
+    try testing.expectEqual(virtio_blk.blk_s_ok, d.blk.write(at, @intFromPtr(&one)));
+    try testing.expectEqual(virtio_blk.blk_s_ok, d.blk.flush());
     try testing.expectEqual(@as(usize, 0), c.pending());
-    try testing.expectEqual(virtio.blk_s_ok, d.blk.write(at, @intFromPtr(&two)));
-    try testing.expectEqual(virtio.blk_s_ok, d.blk.write(at + 1, @intFromPtr(&two)));
+    try testing.expectEqual(virtio_blk.blk_s_ok, d.blk.write(at, @intFromPtr(&two)));
+    try testing.expectEqual(virtio_blk.blk_s_ok, d.blk.write(at + 1, @intFromPtr(&two)));
     try testing.expectEqual(@as(u8, 2), d.bytes[at * sector]);
     const Every = struct {
         fn second(_: void, i: usize) bool {
@@ -762,9 +762,9 @@ test "a write cache: a flush keeps, a cut drops what waits, and keeps what it is
     try testing.expectEqual(@as(u8, 1), d.bytes[at * sector]);
     try testing.expectEqual(@as(u8, 2), d.bytes[(at + 1) * sector]);
     // A flush once the power is gone keeps nothing.
-    try testing.expectEqual(virtio.blk_s_ok, d.blk.write(at, @intFromPtr(&two)));
+    try testing.expectEqual(virtio_blk.blk_s_ok, d.blk.write(at, @intFromPtr(&two)));
     d.blk.fail_after = d.blk.requests;
-    try testing.expectEqual(virtio.blk_s_ioerr, d.blk.flush());
+    try testing.expectEqual(virtio_blk.blk_s_ioerr, d.blk.flush());
     d.blk.fail_after = null;
     c.cut(d, {}, struct {
         fn none(_: void, _: usize) bool {

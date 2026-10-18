@@ -7,6 +7,7 @@
 const metal = @import("metal");
 const serial = metal.serial;
 const virtio = metal.virtio;
+const virtio_blk = metal.virtio_blk;
 
 comptime {
     _ = metal.boot;
@@ -16,7 +17,7 @@ comptime {
 /// which the linker places at a fixed physical address that paging maps to
 /// itself -- so `&sector` is both a pointer this code can use and an address
 /// the device can write.
-var blk_mem: virtio.BlockMemory align(4096) = .{};
+var blk_mem: virtio_blk.BlockMemory align(4096) = .{};
 var sector: [512]u8 align(4096) = undefined;
 var scratch: [512]u8 align(4096) = undefined;
 
@@ -62,7 +63,7 @@ pub fn kmain() noreturn {
     // the OEM name at offset 3. Reading it proves the transfer moved the right
     // bytes and not merely some.
     const st = blk.read(0, @intFromPtr(&sector));
-    if (st != virtio.blk_s_ok) {
+    if (st != virtio_blk.blk_s_ok) {
         serial.put("  read status ");
         serial.putDec(st);
         serial.put("\n");
@@ -82,10 +83,10 @@ pub fn kmain() noreturn {
     const probe_lba: u64 = blk.capacity - 1;
     for (&scratch, 0..) |*b, i| b.* = @truncate(i *% 7 +% 3);
     const wst = blk.write(probe_lba, @intFromPtr(&scratch));
-    if (wst != virtio.blk_s_ok) serial.fail("the write was refused");
+    if (wst != virtio_blk.blk_s_ok) serial.fail("the write was refused");
     @memset(&sector, 0);
     const rst = blk.read(probe_lba, @intFromPtr(&sector));
-    if (rst != virtio.blk_s_ok) serial.fail("the read back was refused");
+    if (rst != virtio_blk.blk_s_ok) serial.fail("the read back was refused");
     for (sector, 0..) |b, i| {
         if (b != @as(u8, @truncate(i *% 7 +% 3))) {
             serial.put("  mismatch at byte ");

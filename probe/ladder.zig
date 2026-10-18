@@ -37,6 +37,7 @@ const std = @import("std");
 const metal = @import("metal");
 const serial = metal.serial;
 const virtio = metal.virtio;
+const virtio_blk = metal.virtio_blk;
 const disk_fat = metal.disk_fat;
 const pages = metal.pages;
 const pvh = metal.pvh;
@@ -73,7 +74,7 @@ var gpa: std.heap.DebugAllocator(.{
     .page_size = pages.page_size,
 }) = .{};
 
-var blk_mem: virtio.BlockMemory align(4096) = .{};
+var blk_mem: virtio_blk.BlockMemory align(4096) = .{};
 var scratch: [disk_fat.sector_size]u8 align(4096) = undefined;
 var sector: [disk_fat.sector_size]u8 align(4096) = undefined;
 var block: [4096]u8 = undefined;
@@ -108,7 +109,7 @@ fn fromCommandLine(comptime name: []const u8, default: usize) usize {
 
 /// Runs `op` `count` times and prints the cost per operation of each tenth of
 /// the run, in nanoseconds, with the disk requests each tenth made.
-fn rung(name: []const u8, count: usize, blk: *virtio.Block, context: anytype, comptime op: fn (@TypeOf(context), usize) void) void {
+fn rung(name: []const u8, count: usize, blk: *virtio_blk.Block, context: anytype, comptime op: fn (@TypeOf(context), usize) void) void {
     const per = @max(count / tenths, 1);
     var spent: [tenths]i96 = @splat(0);
     var requests: [tenths]u64 = @splat(0);
@@ -201,7 +202,7 @@ fn isn() u32 {
 /// comes. This one serves `count` connections — a request of any size ending
 /// in a blank line, an answer, our FIN, their FIN — and times each from its
 /// SYN to its close, bucketed by arrival.
-fn tcpConnections(link: *Link, count: usize, blk: *virtio.Block) void {
+fn tcpConnections(link: *Link, count: usize, blk: *virtio_blk.Block) void {
     for (&conns, &conn_rx, &conn_tx) |*c, *r, *t| c.* = .{ .rx = r, .tx = t };
     var table = tcp.Table.init(link.ip, link.nic.mac, 80, &conns, &tcp_out, isn);
     var wire = metal.stream.Wire{ .nic = link.nic };
@@ -312,18 +313,18 @@ fn alloc(a: std.mem.Allocator, _: usize) void {
     a.free(large);
 }
 
-fn readSame(blk: *virtio.Block, _: usize) void {
-    if (blk.read(raw_first, @intFromPtr(&sector)) != virtio.blk_s_ok) serial.fail("read_same: the read failed");
+fn readSame(blk: *virtio_blk.Block, _: usize) void {
+    if (blk.read(raw_first, @intFromPtr(&sector)) != virtio_blk.blk_s_ok) serial.fail("read_same: the read failed");
 }
 
-fn writeSame(blk: *virtio.Block, _: usize) void {
-    if (blk.write(raw_first, @intFromPtr(&sector)) != virtio.blk_s_ok) serial.fail("write_same: the write failed");
+fn writeSame(blk: *virtio_blk.Block, _: usize) void {
+    if (blk.write(raw_first, @intFromPtr(&sector)) != virtio_blk.blk_s_ok) serial.fail("write_same: the write failed");
 }
 
-fn writeSpread(blk: *virtio.Block, k: usize) void {
+fn writeSpread(blk: *virtio_blk.Block, k: usize) void {
     const lba = raw_first + 1 + k;
     if (lba >= blk.capacity) serial.fail("write_spread: the rung ran off the end of the disk");
-    if (blk.write(lba, @intFromPtr(&sector)) != virtio.blk_s_ok) serial.fail("write_spread: the write failed");
+    if (blk.write(lba, @intFromPtr(&sector)) != virtio_blk.blk_s_ok) serial.fail("write_spread: the write failed");
 }
 
 /// The application's append, verbatim (see probe/append.zig).

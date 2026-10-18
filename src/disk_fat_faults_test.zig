@@ -864,7 +864,7 @@ test "a write that lands and answers failure (or fails) to a held FAT sector, it
     for (stopped_ops) |op| {
         if (std.mem.indexOf(u8, op.name, "spanning FAT sectors") == null) continue;
         // FAT16 and FAT32, each with its FAT held.
-        for ([_]@FieldType(@import("virtio.zig").Block.Fault, "kind"){ .fails, .lands_and_fails }) |fault| for (formats) |shape| {
+        for ([_]@FieldType(@import("virtio_blk.zig").Block.Fault, "kind"){ .fails, .lands_and_fails }) |fault| for (formats) |shape| {
             // Each format with its FAT held, the one that holds it.
             const cfg: Config = .{ .shape = shape, .cached = true };
             const total = try requestsOf(op, cfg);
@@ -1082,12 +1082,12 @@ test "a write that lands and answers failure, with the FAT on the disk and its r
 }
 
 test "a disk that lies (a write that lands nothing or half, a read of other bytes) never stops the machine, and the next boot mounts and checks it" {
-    const virtio = @import("virtio.zig");
+    const virtio_blk = @import("virtio_blk.zig");
     // What `Volume.check` found across every run, by problem: the boot's
     // disk check is where a lie that damaged the volume is seen.
     var found = [_]u32{0} ** @typeInfo(disk_fat.Problem).@"enum".fields.len;
     var runs: u32 = 0;
-    for ([_]@FieldType(virtio.Block.Fault, "kind"){ .lands_nothing, .torn, .garbage }) |lie| {
+    for ([_]@FieldType(virtio_blk.Block.Fault, "kind"){ .lands_nothing, .torn, .garbage }) |lie| {
         for (stopped_ops) |op| {
             for (configs) |cfg| {
                 if (!cfg.cached) continue; // the FAT held, as the kernel holds it
@@ -1285,7 +1285,7 @@ test "a request that fails or lies leaves no cluster lost uncounted, its commit 
     // write left is not known, and every reader of it must take one
     // verdict; a caller that read the disk again could free nothing while
     // the count said taken.
-    const Kind = @FieldType(@import("virtio.zig").Block.Fault, "kind");
+    const Kind = @FieldType(@import("virtio_blk.zig").Block.Fault, "kind");
     const faults = [_]struct { kind: Kind, then_fail: u8 }{
         .{ .kind = .fails, .then_fail = 0 },
         .{ .kind = .lands_and_fails, .then_fail = 0 },
@@ -1514,7 +1514,7 @@ test "a write that lands and answers failure as a counted orphan run is tombston
             var m: u64 = 0;
             while (m < 40) : (m += 1) {
                 var after: [2]u64 = undefined;
-                for ([_]@FieldType(@import("virtio.zig").Block.Fault, "kind"){ .lands_and_fails, .fails }, 0..) |fault, w| {
+                for ([_]@FieldType(@import("virtio_blk.zig").Block.Fault, "kind"){ .lands_and_fails, .fails }, 0..) |fault, w| {
                     try d.restore(&mounted);
                     d.blk.fault = .{ .at = d.blk.requests + n, .kind = .fails };
                     d.vol.writeFile("data/A Long Name For A First File.txt", &body) catch {};
@@ -1539,7 +1539,7 @@ test "a write that lands and answers failure as a counted orphan run is tombston
 }
 
 test "a disk that lies to any one request of an upload-sized write on FAT32 never damages the volume the next boot mounts, a new file or an overwrite (metal-vmm QUEUE 181, 188.1)" {
-    const virtio = @import("virtio.zig");
+    const virtio_blk = @import("virtio_blk.zig");
     // Six MB: 12,288 clusters, 96 FAT sectors a copy, past what is weighed
     // sector by sector.
     const bytes = try testing.allocator.alloc(u8, 6 << 20);
@@ -1565,7 +1565,7 @@ test "a disk that lies to any one request of an upload-sized write on FAT32 neve
         if (over) try d.vol.writeFile("up.bin", old);
         var mounted = try d.mountSaved(true);
         defer d.dropMounted(&mounted);
-        for ([_]@FieldType(virtio.Block.Fault, "kind"){ .lands_nothing, .torn, .torn_tail }) |lie| {
+        for ([_]@FieldType(virtio_blk.Block.Fault, "kind"){ .lands_nothing, .torn, .torn_tail }) |lie| {
             var n: u64 = 0;
             while (n < total) : (n = nextStop(n, total)) {
                 try d.restore(&mounted);

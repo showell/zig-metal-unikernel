@@ -11,6 +11,7 @@ const std = @import("std");
 const metal = @import("metal");
 const serial = metal.serial;
 const virtio = metal.virtio;
+const virtio_blk = metal.virtio_blk;
 const gpt = metal.gpt;
 const disk_fat = metal.disk_fat;
 
@@ -22,7 +23,7 @@ comptime {
     _ = metal.boot;
 }
 
-var blk_mem: virtio.BlockMemory align(4096) = .{};
+var blk_mem: virtio_blk.BlockMemory align(4096) = .{};
 var scratch: [disk_fat.sector_size]u8 align(4096) = undefined;
 
 /// A bump allocator over a static arena. Nothing is ever freed, which is what

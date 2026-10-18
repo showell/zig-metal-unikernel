@@ -13,6 +13,7 @@ pub const request_line = @import("request_line.zig");
 pub const uploads_seen = @import("uploads_seen.zig");
 pub const screen = @import("screen.zig");
 pub const virtio = @import("virtio.zig");
+pub const virtio_blk = @import("virtio_blk.zig");
 pub const scsi = @import("scsi.zig");
 pub const scsi_mode = @import("scsi_mode.zig");
 pub const boot_facts = @import("boot_facts.zig");

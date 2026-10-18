@@ -42,7 +42,7 @@
 
 const std = @import("std");
 const builtin = @import("builtin");
-const virtio = @import("virtio.zig");
+const virtio_blk = @import("virtio_blk.zig");
 const props = @import("coverage");
 const plant = @import("plant.zig");
 
@@ -340,7 +340,7 @@ pub fn hasEmptyPart(path: []const u8) bool {
 pub const Writes = enum { taken, refused };
 
 pub const Volume = struct {
-    blk: *virtio.Block,
+    blk: *virtio_blk.Block,
     /// **EVERY SECTOR WRITE TRIED**, landed or not: a check made a slice at a
     /// time (`CheckRun`) starts again when this moves under it.
     changes: u64 = 0,
@@ -551,8 +551,8 @@ pub const Volume = struct {
     /// **A BOOT SECTOR IS NOT TRUSTED.** Every field is checked before it
     /// computes an offset: a sector of zeros or of another filesystem would
     /// otherwise send reads anywhere.
-    pub fn mount(blk: *virtio.Block, scratch: *[sector_size]u8, start_lba: u32) Error!Volume {
-        if (blk.read(start_lba, @intFromPtr(scratch)) != virtio.blk_s_ok) {
+    pub fn mount(blk: *virtio_blk.Block, scratch: *[sector_size]u8, start_lba: u32) Error!Volume {
+        if (blk.read(start_lba, @intFromPtr(scratch)) != virtio_blk.blk_s_ok) {
             props.reachable(@src(), "fat: a mount cannot read the boot sector", null);
             return Error.ReadFailed;
         }
@@ -838,7 +838,7 @@ pub const Volume = struct {
             @memcpy(into, held);
             return;
         };
-        if (self.blk.read(self.start_lba + lba, @intFromPtr(into)) != virtio.blk_s_ok) {
+        if (self.blk.read(self.start_lba + lba, @intFromPtr(into)) != virtio_blk.blk_s_ok) {
             self.read_failures +%= 1;
             props.reachable(@src(), "fat: a sector read fails", null);
             return Error.ReadFailed;
@@ -852,7 +852,7 @@ pub const Volume = struct {
         while (done < count) {
             const n = @min(count - done, self.blk.most_sectors);
             const status = self.blk.readMany(self.start_lba + lba + done, @intFromPtr(into + done * sector_size), n);
-            if (status != virtio.blk_s_ok) {
+            if (status != virtio_blk.blk_s_ok) {
                 self.read_failures +%= 1;
                 props.reachable(@src(), "fat: a run of sectors fails to read", null);
                 return Error.ReadFailed;
@@ -914,7 +914,7 @@ pub const Volume = struct {
             return refuseWrite();
         }
         self.changes +%= 1;
-        if (self.blk.write(self.start_lba + lba, @intFromPtr(from)) != virtio.blk_s_ok) {
+        if (self.blk.write(self.start_lba + lba, @intFromPtr(from)) != virtio_blk.blk_s_ok) {
             self.write_failures +%= 1;
             if (self.dirs) |*c| c.drop(lba, 1);
             props.reachable(@src(), "fat: a sector write fails", null);
@@ -943,7 +943,7 @@ pub const Volume = struct {
             return refuseWrite();
         }
         self.changes +%= 1;
-        if (self.blk.writeMany(self.start_lba + lba, @intFromPtr(from), count) != virtio.blk_s_ok) {
+        if (self.blk.writeMany(self.start_lba + lba, @intFromPtr(from), count) != virtio_blk.blk_s_ok) {
             self.write_failures +%= 1;
             if (self.dirs) |*c| c.drop(lba, count);
             props.reachable(@src(), "fat: a run of sectors fails to write", null);

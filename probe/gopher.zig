@@ -36,6 +36,7 @@ const std = @import("std");
 const metal = @import("metal");
 const serial = metal.serial;
 const virtio = metal.virtio;
+const virtio_blk = metal.virtio_blk;
 const scsi = metal.scsi;
 const net = metal.net;
 const dhcp = metal.dhcp;
@@ -152,11 +153,11 @@ var gpa: std.heap.DebugAllocator(.{
     .page_size = pages.page_size,
 }) = .{};
 
-pub var blk_mem: virtio.BlockMemory align(4096) = .{};
-pub var volume_mem: virtio.BlockMemory align(4096) = .{};
+pub var blk_mem: virtio_blk.BlockMemory align(4096) = .{};
+pub var volume_mem: virtio_blk.BlockMemory align(4096) = .{};
 /// The disks, for the per-request log: how many requests they served and how
 /// long they took. The boot disk, then the volume if one is attached.
-pub var disks: [2]?*virtio.Block = .{ null, null };
+pub var disks: [2]?*virtio_blk.Block = .{ null, null };
 var nic_mem: net.Memory align(4096) = .{};
 var rng_mem: rng.Memory align(4096) = .{};
 var sector: [disk_fat.sector_size]u8 align(4096) = undefined;
@@ -423,7 +424,7 @@ pub fn kmain() noreturn {
     const io = Io.io();
     const base = webbox.mem_meter.init(gpa.allocator());
     const conf = readConfig(io, base);
-    var volume_disk: virtio.Block = undefined;
+    var volume_disk: virtio_blk.Block = undefined;
     if (dataVolume()) |b| {
         volume_disk = b;
         volume_disk.read_tries = boot_read_tries;
