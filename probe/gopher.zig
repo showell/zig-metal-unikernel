@@ -1477,7 +1477,7 @@ pub var idle_work: metal.idle.Idle = .{};
 /// each served turn, and calls on idle turns while it says there is more.
 /// A request waits at most one slice, so a slice past `between_target_ns`
 /// is counted, for /admin/host. 50 ms: a slice is 100,000 steps or one
-/// store call (zig-webbox `script_route.slice_steps`), a few ms on this
+/// store call (shale's `script_route.slice_steps`), a few ms on this
 /// machine; 50 ms is a wait a person at a page would notice, and a quarter
 /// of the idle step's 200 ms budget, so an overrun is a slice gone wrong,
 /// not a slow one.

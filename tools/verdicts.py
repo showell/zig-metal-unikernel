@@ -278,12 +278,14 @@ def freshness() -> str:
     if not os.path.isdir(SHALE_SRC):
         return f"no shale sources at {SHALE_SRC} (SHALE_ROOT)"
     escaped = []
+    # Every folder down: Shale's interpreter is in shale's src/script/.
     for src in (SRC, WEBBOX_SRC, SHALE_SRC):
-        for name in sorted(os.listdir(src)):
-            if name.endswith(".zig") and name != "host_io_std.zig":
-                with open(os.path.join(src, name)) as f:
-                    if STD_IO_ALIAS.search(f.read()):
-                        escaped.append(name)
+        for folder, _, names in sorted(os.walk(src)):
+            for name in sorted(names):
+                if name.endswith(".zig") and name != "host_io_std.zig":
+                    with open(os.path.join(folder, name)) as f:
+                        if STD_IO_ALIAS.search(f.read()):
+                            escaped.append(os.path.relpath(os.path.join(folder, name), src))
     if escaped:
         return "these alias std's Io, not host_io's, and would be std's here: " + " ".join(escaped)
     # **AND ITS ASSETS READ** (Phase B step 3): the build reads the same
