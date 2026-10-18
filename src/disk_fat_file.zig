@@ -164,6 +164,43 @@ pub fn tombstoned(self: *Volume, held: Held, k: u32, len: u32, how: Landing) voi
     }
 }
 
+/// **LONG-NAME PART `part` OF `parts`** of `name`, its checksum `sum`, into
+/// `e`, whole: the sequence number (0x40 on the last part), the 13 UCS-2
+/// characters at `long_offsets`, the name's end a 0x0000 and the rest
+/// 0xFFFF; the attribute, type, checksum and cluster fields.
+fn putLongPart(e: *[dirent_size]u8, name: []const u8, part: u32, parts: u32, sum: u8) void {
+    @memset(e, 0);
+    e[0] = @intCast(part | (if (part == parts) @as(u32, 0x40) else 0));
+    e[11] = attr_long_name;
+    e[12] = 0;
+    e[13] = sum;
+    e[26] = 0;
+    e[27] = 0;
+    const base = (part - 1) * 13;
+    for (long_offsets, 0..) |off, i| {
+        const idx = base + i;
+        const c: u16 = if (idx < name.len)
+            name[idx]
+        else if (idx == name.len) 0x0000 else 0xFFFF;
+        e[off] = @truncate(c);
+        e[off + 1] = @truncate(c >> 8);
+    }
+}
+
+/// **THE SHORT ENTRY** into `e`, whole: its 8.3 name, its attribute, its
+/// time, its first cluster and its size.
+fn putShortEntry(e: *[dirent_size]u8, short: [11]u8, attr: u8, when: Dos, first: Cluster, size: u32) void {
+    @memset(e, 0);
+    @memcpy(e[0..11], &short);
+    e[11] = attr;
+    putStamp(e, when);
+    putCluster(e, first);
+    e[28] = @truncate(size);
+    e[29] = @truncate(size >> 8);
+    e[30] = @truncate(size >> 16);
+    e[31] = @truncate(size >> 24);
+}
+
 /// Tombstones the run's orphans, then writes the long-name parts and the
 /// short entry that closes them.
 pub fn writeEntry(
@@ -253,22 +290,7 @@ pub fn writeEntry(
         try self.readSector(slot.lba, self.scratch);
         const e = self.scratch[slot.at..][0..dirent_size];
         const part_was = e.*;
-        @memset(e, 0);
-        e[0] = @intCast(part | (if (part == parts) @as(u32, 0x40) else 0));
-        e[11] = attr_long_name;
-        e[12] = 0;
-        e[13] = sum;
-        e[26] = 0;
-        e[27] = 0;
-        const base = (part - 1) * 13;
-        for (long_offsets, 0..) |off, i| {
-            const idx = base + i;
-            const c: u16 = if (idx < name.len)
-                name[idx]
-            else if (idx == name.len) 0x0000 else 0xFFFF;
-            e[off] = @truncate(c);
-            e[off + 1] = @truncate(c >> 8);
-        }
+        putLongPart(e, name, part, parts, sum);
         const part_written = e.*;
         self.writeSector(slot.lba, self.scratch) catch |err| {
             switch (self.entryRefused(slot.lba, slot.at, &part_was, &part_written)) {
@@ -288,15 +310,7 @@ pub fn writeEntry(
     try self.readSector(slot.lba, self.scratch);
     const e = self.scratch[slot.at..][0..dirent_size];
     const was = e.*;
-    @memset(e, 0);
-    @memcpy(e[0..11], &short);
-    e[11] = attr;
-    putStamp(e, self.stamp());
-    putCluster(e, first);
-    e[28] = @truncate(size);
-    e[29] = @truncate(size >> 8);
-    e[30] = @truncate(size >> 16);
-    e[31] = @truncate(size >> 24);
+    putShortEntry(e, short, attr, self.stamp(), first, size);
     const written = e.*;
     self.writeSector(slot.lba, self.scratch) catch |err| {
         if (commit) |c| {
