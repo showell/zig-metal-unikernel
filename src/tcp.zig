@@ -804,6 +804,20 @@ pub const Table = struct {
         return null;
     }
 
+    /// **A CONNECTION ENTERS SYN-RECEIVED**, a SYN taken or a half-open
+    /// revived: its clocks start (opened, heard, the retransmission timer),
+    /// it is counted an arrival, its serial that count, and the slots noted.
+    /// Every way into SYN-RECEIVED goes through here, so none forgets one.
+    fn enterSynReceived(self: *Table, c: *Conn, now: i96) void {
+        c.state = .syn_received;
+        c.opened_at = now;
+        c.heard_at = now;
+        c.rto_at = now + c.rto_ns;
+        self.arrivals += 1;
+        c.serial = self.arrivals;
+        self.noteSlots();
+    }
+
     /// Rebuilds `e` as `syn_received` in a free slot, else in a stuck
     /// half-open's (almost certainly a flood's: an ACK proves its sender is
     /// real, a half-open proves nothing). Null with neither.
@@ -821,13 +835,7 @@ pub const Table = struct {
         c.mss = e.mss;
         c.wnd = e.wnd;
         c.told_wnd = e.told_wnd;
-        c.state = .syn_received;
-        c.opened_at = now;
-        c.heard_at = now;
-        c.rto_at = now + c.rto_ns;
-        self.arrivals += 1;
-        c.serial = self.arrivals;
-        self.noteSlots();
+        self.enterSynReceived(c, now);
         return slot;
     }
 
@@ -1447,13 +1455,7 @@ pub const Table = struct {
         if (named < min_mss) props.reachable(@src(), "tcp: a peer names a segment size under the least, and is sent the least", .{ .named = named });
         c.mss = std.math.clamp(named, min_mss, our_mss);
         c.wnd = window;
-        c.state = .syn_received;
-        c.opened_at = now;
-        c.heard_at = now;
-        c.rto_at = now + c.rto_ns;
-        self.arrivals += 1;
-        c.serial = self.arrivals;
-        self.noteSlots();
+        self.enterSynReceived(c, now);
         self.emit(wire, slot, flag_syn | flag_ack, c.una, "");
         // The handshake is the first RTT sample.
         c.time(now, c.una +% 1);
