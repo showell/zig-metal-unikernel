@@ -20,7 +20,7 @@ handle:
 the data moves once. The reason is each user's lifetime cap of 1 GiB, not
 today's size. FAT16 stops at 2 GiB; FAT32 is limited here by the FAT this
 machine holds in memory, 32 MiB, which is about 256 GiB at 32 KiB clusters
-(`gopher.zig`'s `fat_budget_bytes`). This machine mounts both kinds, decided
+(`volumes.zig`'s `fat_budget_bytes`). This machine mounts both kinds, decided
 by cluster count as the spec says, so a FAT16 volume keeps serving until
 the FAT32 one is attached.
 
