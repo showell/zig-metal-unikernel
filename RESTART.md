@@ -71,7 +71,7 @@ is almost always about one request or one moment:
 
 - a `@panic` in the application;
 - a safety check;
-- the stack guard (`gopher.zig`'s `checkStack`);
+- the stack guard (`gopher.zig`'s `reportStack`);
 - `io.zig`'s directory-walk limits;
 - a CPU exception.
 

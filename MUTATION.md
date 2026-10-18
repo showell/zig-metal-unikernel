@@ -12,7 +12,7 @@ restored after each run, and no mutant was committed anywhere.
 
 **The mutants were planted on gopher-metal `a9163f2`, and every `where`
 below is that commit's** (`git show a9163f2:<file>`). Every file mutated but
-`durable.zig` has changed since (`fat16.zig` is `disk_fat.zig`, split into
+`durable.zig` has changed since (fat16.zig is `disk_fat.zig`, split into
 several files, and much of `tcp.zig`'s timing is in `tcp_timeouts.zig`), so a line number here does
 not find the line on `master`; the mutant's description and its function
 do.
