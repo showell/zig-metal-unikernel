@@ -1362,26 +1362,28 @@ pub const Table = struct {
         return c.fin.is(.acknowledged);
     }
 
-    /// Feeds one received frame in. `now` is the caller's clock.
-    pub fn handle(self: *Table, wire: anytype, frame: []const u8, now: i96) Result {
+    /// **WHAT `handle` TAKES OF A FRAME**: an IPv4 TCP segment for this
+    /// machine, on a port the table holds, its checksum good. Anything else is
+    /// counted where it is passed by, and null.
+    fn admit(self: *Table, frame: []const u8) ?proto.Packet {
         const pkt = switch (proto.readIpv4(frame)) {
             .packet => |p| p,
             .not => |why| {
                 self.passed.note(why);
-                return .{ .event = .nothing };
+                return null;
             },
         };
         if (pkt.protocol != proto.proto_tcp) {
             self.passed.not_tcp +%= 1;
-            return .{ .event = .nothing };
+            return null;
         }
         if (!eql(&pkt.dst_ip, &self.local_ip)) {
             self.passed.not_for_us +%= 1;
-            return .{ .event = .nothing };
+            return null;
         }
         if (pkt.payload.len < header_len) {
             self.passed.malformed_ip +%= 1;
-            return .{ .event = .nothing };
+            return null;
         }
 
         const t = pkt.payload;
@@ -1409,14 +1411,145 @@ pub const Table = struct {
         const dst_port = proto.readBe16(t[2..4]);
         if (dst_port != self.port and !self.initiatedOn(dst_port)) {
             self.passed.not_for_us +%= 1;
-            return .{ .event = .nothing };
+            return null;
         }
         if (proto.pseudoChecksum(pkt.src_ip, pkt.dst_ip, proto.proto_tcp, t) != 0) {
             self.damaged += 1;
             props.reachable(@src(), "tcp: a damaged segment is dropped", null);
-            return .{ .event = .nothing };
+            return null;
         }
+        return pkt;
+    }
 
+    /// **A SYN FOR NO CONNECTION OPENS ONE** (LISTEN, `handle`): a free slot,
+    /// or the oldest half-open's, given way; the peer's segment size held to
+    /// ours and the least; SYN-RECEIVED, and our SYN-ACK, the handshake the
+    /// first RTT sample. With no slot to take, refused.
+    fn accept(self: *Table, wire: anytype, pkt: proto.Packet, seg: Segment, now: i96) void {
+        const src_port = seg.src_port;
+        const seq = seg.seq;
+        const window = seg.window;
+        const slot = self.free(.accepted) orelse self.oldestHalfOpen(now) orelse {
+            self.refused += 1;
+            props.reachable(@src(), "tcp: a SYN finds the table full, and nothing to give way", null);
+            return;
+        };
+        const c = &self.conns[slot];
+        c.reset();
+        c.peer_ip = pkt.src_ip;
+        c.peer_mac = pkt.src_mac;
+        c.peer_port = src_port;
+        c.local_port = self.port;
+        c.rcv_nxt = seq +% 1; // their SYN takes one
+        c.wl1 = seq;
+        c.una = self.isn();
+        const named = parseMss(seg.options) orelse default_mss;
+        if (named < min_mss) props.reachable(@src(), "tcp: a peer names a segment size under the least, and is sent the least", .{ .named = named });
+        c.mss = std.math.clamp(named, min_mss, our_mss);
+        c.wnd = window;
+        c.state = .syn_received;
+        c.opened_at = now;
+        c.heard_at = now;
+        c.rto_at = now + c.rto_ns;
+        self.arrivals += 1;
+        c.serial = self.arrivals;
+        self.noteSlots();
+        self.emit(wire, slot, flag_syn | flag_ack, c.una, "");
+        // The handshake is the first RTT sample.
+        c.time(now, c.una +% 1);
+    }
+
+    /// **THE HANDSHAKE COMPLETES** (SYN-RECEIVED, `handle`): the peer's ACK
+    /// of our SYN, checked already, takes `una` and the window, and the
+    /// connection is ESTABLISHED.
+    fn establish(self: *Table, c: *Conn, seg: Segment, now: i96) void {
+        const seq = seg.seq;
+        const number = seg.ack;
+        const window = seg.window;
+        c.una = number;
+        c.wnd = window;
+        c.wl1 = seq;
+        c.wl2 = number;
+        c.rto_at = null;
+        c.retries = 0;
+        self.measure(c, number, now);
+        if (c.srtt_ns == 0) c.rto_ns = first_rto_ns;
+        c.state = .established;
+    }
+
+    /// **AN ACK IN A SYNCHRONIZED STATE** (`handle`): acknowledged
+    /// (`acknowledge`), and a duplicate counted toward the resend. True when
+    /// it acknowledged our FIN.
+    fn takeAck(self: *Table, wire: anytype, i: usize, seg: Segment, now: i96) bool {
+        const c = &self.conns[i];
+        const seq = seg.seq;
+        const number = seg.ack;
+        const flags = seg.ctl.byte();
+        const window = seg.window;
+        const data = seg.data;
+        const was = c.una;
+        const held = c.wnd;
+        const fin_acknowledged = self.acknowledge(c, seq, number, window, now);
+        // **A DUPLICATE ACK** (RFC 5681 §2): no data, SYN or FIN; names
+        // SND.UNA exactly; leaves the window unchanged; and something of
+        // ours is outstanding. It says the peer received what came after
+        // a hole; the third resends at once.
+        //
+        // **NOT WHILE THE WINDOW IS SHUT, AND ONCE PER LOSS.** A peer
+        // with no room answers every probe with the same ACK, which is no
+        // news of a loss; and a peer repeating itself forever must not
+        // hold the connection open by pushing the timer out, so there is
+        // no second resend until `una` moves.
+        const bare = data.len == 0 and flags & flag_fin == 0 and flags & flag_syn == 0;
+        if (c.una != was) {
+            c.dupacks = 0;
+            c.duplicates = .counting;
+        } else if (bare and number == c.una and c.wnd == held and c.wnd != 0 and c.highest() != c.una) {
+            // Counted to the resend and no further: a peer repeating
+            // itself forever must not overflow the count.
+            if (c.dupacks < dupacks_before_resend) c.dupacks += 1;
+            props.alwaysLessThanOrEqualTo(@src(), c.dupacks, dupacks_before_resend, "tcp: duplicate ACKs are counted to the resend and no further", null);
+            if (c.dupacks == dupacks_before_resend and c.duplicates == .counting) self.resend(wire, i, now);
+        }
+        return fin_acknowledged;
+    }
+
+    /// **THE SEGMENT'S TEXT, TAKEN** (`handle`, the next segment's): what
+    /// fits, and what it makes whole of the text held ahead. Gives how much of
+    /// `data` was taken; the ACK that follows names the new RCV.NXT.
+    fn takeText(self: *Table, c: *Conn, data: []const u8) usize {
+        // **WHAT FITS IS TAKEN, AND ONLY THAT IS ACKNOWLEDGED.** The peer
+        // resends the rest once the reader makes room; a FIN behind the
+        // untaken part waits for it.
+        const n = @min(c.room(), data.len);
+        props.sometimes(@src(), n < data.len, "tcp: a peer sends past the window and only what fits is taken", .{ .room = c.room(), .len = data.len });
+        if (n < data.len) self.past_window +%= 1;
+        @memcpy(c.rx[c.end..][0..n], data[0..n]);
+        c.end += n;
+        c.rcv_nxt +%= @intCast(n);
+        if (n > 0) c.heard();
+        // **WHAT IT MAKES WHOLE IS TAKEN TOO**, and the one ACK after it
+        // names the new RCV.NXT. RFC 5681 §4.2:
+        // > provide feedback to senders recovering from losses, the receiver
+        // > SHOULD send an immediate ACK when it receives a data segment that
+        // > fills in all or part of a gap in the sequence space.
+        if (n > 0 and !c.held.empty()) {
+            const more = c.held.advance(@intCast(n));
+            if (more > 0) {
+                c.end += more;
+                c.rcv_nxt +%= more;
+                self.held_delivered +%= more;
+                props.reachable(@src(), "tcp: a hole filled delivers what was held behind it", .{ .bytes = more });
+            }
+        }
+        return n;
+    }
+
+    /// Feeds one received frame in. `now` is the caller's clock.
+    pub fn handle(self: *Table, wire: anytype, frame: []const u8, now: i96) Result {
+        const pkt = self.admit(frame) orelse return .{ .event = .nothing };
+        const t = pkt.payload;
+        const dst_port = proto.readBe16(t[2..4]);
         const seg = Segment.parse(t) orelse return .{ .event = .nothing };
         const src_port = seg.src_port;
         const seq = seg.seq;
@@ -1557,34 +1690,7 @@ pub const Table = struct {
                 self.refuse(wire, .{ .mac = pkt.src_mac, .ip = pkt.src_ip, .port = src_port, .from = dst_port }, seq, number, flags, data.len);
                 return .{ .event = .nothing };
             }
-            const slot = self.free(.accepted) orelse self.oldestHalfOpen(now) orelse {
-                self.refused += 1;
-                props.reachable(@src(), "tcp: a SYN finds the table full, and nothing to give way", null);
-                return .{ .event = .nothing };
-            };
-            const c = &self.conns[slot];
-            c.reset();
-            c.peer_ip = pkt.src_ip;
-            c.peer_mac = pkt.src_mac;
-            c.peer_port = src_port;
-            c.local_port = self.port;
-            c.rcv_nxt = seq +% 1; // their SYN takes one
-            c.wl1 = seq;
-            c.una = self.isn();
-            const named = parseMss(seg.options) orelse default_mss;
-            if (named < min_mss) props.reachable(@src(), "tcp: a peer names a segment size under the least, and is sent the least", .{ .named = named });
-            c.mss = std.math.clamp(named, min_mss, our_mss);
-            c.wnd = window;
-            c.state = .syn_received;
-            c.opened_at = now;
-            c.heard_at = now;
-            c.rto_at = now + c.rto_ns;
-            self.arrivals += 1;
-            c.serial = self.arrivals;
-            self.noteSlots();
-            self.emit(wire, slot, flag_syn | flag_ack, c.una, "");
-            // The handshake is the first RTT sample.
-            c.time(now, c.una +% 1);
+            self.accept(wire, pkt, seg, now);
             return .{ .event = .nothing };
         };
 
@@ -1712,43 +1818,10 @@ pub const Table = struct {
                 self.segment(wire, .{ .mac = c.peer_mac, .ip = c.peer_ip, .port = c.peer_port, .from = c.local_port }, flag_rst, number, 0, 0, "");
                 return .{ .event = .nothing };
             }
-            c.una = number;
-            c.wnd = window;
-            c.wl1 = seq;
-            c.wl2 = number;
-            c.rto_at = null;
-            c.retries = 0;
-            self.measure(c, number, now);
-            if (c.srtt_ns == 0) c.rto_ns = first_rto_ns;
-            c.state = .established;
+            self.establish(c, seg, now);
             event = .opened;
             // The ACK may carry the first data: fall through.
-        } else {
-            const was = c.una;
-            const held = c.wnd;
-            fin_acknowledged = self.acknowledge(c, seq, number, window, now);
-            // **A DUPLICATE ACK** (RFC 5681 §2): no data, SYN or FIN; names
-            // SND.UNA exactly; leaves the window unchanged; and something of
-            // ours is outstanding. It says the peer received what came after
-            // a hole; the third resends at once.
-            //
-            // **NOT WHILE THE WINDOW IS SHUT, AND ONCE PER LOSS.** A peer
-            // with no room answers every probe with the same ACK, which is no
-            // news of a loss; and a peer repeating itself forever must not
-            // hold the connection open by pushing the timer out, so there is
-            // no second resend until `una` moves.
-            const bare = data.len == 0 and flags & flag_fin == 0 and flags & flag_syn == 0;
-            if (c.una != was) {
-                c.dupacks = 0;
-                c.duplicates = .counting;
-            } else if (bare and number == c.una and c.wnd == held and c.wnd != 0 and c.highest() != c.una) {
-                // Counted to the resend and no further: a peer repeating
-                // itself forever must not overflow the count.
-                if (c.dupacks < dupacks_before_resend) c.dupacks += 1;
-                props.alwaysLessThanOrEqualTo(@src(), c.dupacks, dupacks_before_resend, "tcp: duplicate ACKs are counted to the resend and no further", null);
-                if (c.dupacks == dupacks_before_resend and c.duplicates == .counting) self.resend(wire, i, now);
-            }
-        }
+        } else fin_acknowledged = self.takeAck(wire, i, seg, now);
 
         if (early) {
             // **AHEAD: HELD, AND RE-ACKNOWLEDGED AT ONCE** (metal-vmm QUEUE
@@ -1821,30 +1894,7 @@ pub const Table = struct {
                 self.emit(wire, i, flag_ack, c.highest(), "");
                 return self.settle(i, event, fin_acknowledged, now);
             }
-            // **WHAT FITS IS TAKEN, AND ONLY THAT IS ACKNOWLEDGED.** The peer
-            // resends the rest once the reader makes room; a FIN behind the
-            // untaken part waits for it.
-            const n = @min(c.room(), data.len);
-            props.sometimes(@src(), n < data.len, "tcp: a peer sends past the window and only what fits is taken", .{ .room = c.room(), .len = data.len });
-            if (n < data.len) self.past_window +%= 1;
-            @memcpy(c.rx[c.end..][0..n], data[0..n]);
-            c.end += n;
-            c.rcv_nxt +%= @intCast(n);
-            if (n > 0) c.heard();
-            // **WHAT IT MAKES WHOLE IS TAKEN TOO**, and the one ACK below
-            // names the new RCV.NXT. RFC 5681 §4.2:
-            // > provide feedback to senders recovering from losses, the receiver
-            // > SHOULD send an immediate ACK when it receives a data segment that
-            // > fills in all or part of a gap in the sequence space.
-            if (n > 0 and !c.held.empty()) {
-                const more = c.held.advance(@intCast(n));
-                if (more > 0) {
-                    c.end += more;
-                    c.rcv_nxt +%= more;
-                    self.held_delivered +%= more;
-                    props.reachable(@src(), "tcp: a hole filled delivers what was held behind it", .{ .bytes = more });
-                }
-            }
+            const n = self.takeText(c, data);
             self.emit(wire, i, flag_ack, c.highest(), "");
             if (n > 0 and event == .nothing) event = .data;
             if (n < data.len) return self.settle(i, event, fin_acknowledged, now);
