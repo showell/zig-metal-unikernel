@@ -80,7 +80,7 @@ pub const Error = error{ NoOffer, NoAck, Refused };
 
 /// Fills the BOOTP fixed fields and the cookie, and answers where options
 /// start.
-fn writeBootp(p: []u8, xid: u32, mac: [6]u8, broadcast: bool) usize {
+fn writeBootp(p: []u8, xid: u32, mac: [6]u8) usize {
     @memset(p[0..bootp_len], 0);
     p[0] = op_request;
     p[1] = htype_ethernet;
@@ -89,8 +89,9 @@ fn writeBootp(p: []u8, xid: u32, mac: [6]u8, broadcast: bool) usize {
     @memcpy(p[4..8], &proto.be32(xid));
     // **THE BROADCAST FLAG MATTERS.** We have no address yet, so a server that
     // replies by unicast would have to ARP for an address we cannot answer to.
-    // Asking it to broadcast its reply is what makes the exchange work at all.
-    @memcpy(p[10..12], &proto.be16(if (broadcast) 0x8000 else 0));
+    // Asking it to broadcast its reply is what makes the exchange work at all,
+    // so every request asks.
+    @memcpy(p[10..12], &proto.be16(0x8000));
     @memcpy(p[28..34], &mac); // chaddr
     @memcpy(p[236..240], &magic_cookie);
     return 240;
@@ -232,7 +233,7 @@ pub fn acquire(nic: *net.Net, frame: []u8, reply: []u8) Error!Lease {
     const xid = rng.int(u32);
 
     // DISCOVER
-    var at = writeBootp(frame[proto.udp_payload_at..], xid, nic.mac, true);
+    var at = writeBootp(frame[proto.udp_payload_at..], xid, nic.mac);
     const p = frame[proto.udp_payload_at..];
     at = option(p, at, opt_message_type, &.{msg_discover});
     at = option(p, at, opt_param_list, &.{ opt_subnet_mask, opt_router, opt_dns });
@@ -254,7 +255,7 @@ pub fn acquire(nic: *net.Net, frame: []u8, reply: []u8) Error!Lease {
 
     // REQUEST: name the address offered and the server that offered it, so a
     // second server on the wire knows its own offer was declined.
-    at = writeBootp(p, xid, nic.mac, true);
+    at = writeBootp(p, xid, nic.mac);
     at = option(p, at, opt_message_type, &.{msg_request});
     at = option(p, at, opt_requested_ip, &lease.address);
     at = option(p, at, opt_server_id, &lease.server);
@@ -285,7 +286,7 @@ fn takeAck(lease: *Lease, ack: []const u8) void {
 test "acquire reports the lease time the ACK names (metal-vmm QUEUE 193, gap 12)" {
     const mac = [6]u8{ 2, 0, 0, 0, 0, 7 };
     var p: [300]u8 = undefined;
-    var at = writeBootp(&p, 0x1234, mac, true);
+    var at = writeBootp(&p, 0x1234, mac);
     p[0] = op_reply;
     at = option(&p, at, opt_message_type, &.{msg_ack});
     at = option(&p, at, opt_lease_time, &proto.be32(86400));
@@ -295,7 +296,7 @@ test "acquire reports the lease time the ACK names (metal-vmm QUEUE 193, gap 12)
     if (lease.seconds != 86400) return error.TestUnexpectedResult;
     // An ACK that does not say leaves it unsaid; a malformed one too.
     var q: [300]u8 = undefined;
-    at = writeBootp(&q, 0x1234, mac, true);
+    at = writeBootp(&q, 0x1234, mac);
     q[0] = op_reply;
     at = option(&q, at, opt_message_type, &.{msg_ack});
     const short = at;
@@ -319,7 +320,7 @@ test "a NAK is the server's refusal, never a reply that did not come (metal-vmm 
         .{ .t = msg_ack, .want = msg_ack, .kind = .wanted },
         .{ .t = msg_offer, .want = msg_ack, .kind = .other },
     }) |c| {
-        var at = writeBootp(&p, 0x1234, mac, true);
+        var at = writeBootp(&p, 0x1234, mac);
         p[0] = op_reply;
         at = option(&p, at, opt_message_type, &.{c.t});
         p[at] = opt_end;
@@ -351,7 +352,7 @@ test "a frame of any bytes is refused or parsed inside itself, by UDP, ARP and D
     var good: [600]u8 = undefined;
     // A real OFFER for transaction 7, as a server would send it.
     const p = good[proto.udp_payload_at..];
-    var at = writeBootp(p, 7, mac, true);
+    var at = writeBootp(p, 7, mac);
     p[0] = op_reply;
     at = option(p, at, opt_message_type, &.{msg_offer});
     at = option(p, at, opt_subnet_mask, &.{ 255, 255, 255, 0 });

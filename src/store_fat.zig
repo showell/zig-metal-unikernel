@@ -39,15 +39,22 @@ pub const FatStore = struct {
         .replace = replaceV,
     };
 
+    /// What a call that met FAT's error was doing: writing, or looking (a
+    /// read, a remove, a listing).
+    const Doing = enum { writing, looking };
+
     /// FAT's answer, as the Store's. A path whose parent is a file is FAT's
     /// `NotFat16`: a write meets it making a directory (`BadName`), a read or
     /// remove looking for one (`NotFound`).
-    fn map(e: disk_fat.Error, writing: bool) Error {
+    fn map(e: disk_fat.Error, doing: Doing) Error {
         return switch (e) {
             error.NotFound => Error.NotFound,
             error.IsDirectory => Error.IsDirectory,
             error.BadName, error.NameTaken => Error.BadName,
-            error.NotFat16 => if (writing) Error.BadName else Error.NotFound,
+            error.NotFat16 => switch (doing) {
+                .writing => Error.BadName,
+                .looking => Error.NotFound,
+            },
             error.TooBig => Error.TooBig,
             error.Full, error.DirectoryFull => Error.NoSpace,
             // A volume refusing writes (metal-vmm QUEUE 188.2) is the disk not
@@ -82,7 +89,7 @@ pub const FatStore = struct {
     fn entryAt(f: *FatStore, path: []const u8) Error!?disk_fat.Entry {
         return f.vol.open(path) catch |e| switch (e) {
             error.NotFound, error.NotFat16 => null,
-            else => map(e, false),
+            else => map(e, .looking),
         };
     }
 
@@ -92,23 +99,23 @@ pub const FatStore = struct {
         const p = join(try store.checkPath(path, &pb, false), "", &jb);
         const e = (try f.entryAt(p)) orelse return Error.NotFound;
         if (e.isDirectory()) return Error.IsDirectory;
-        return f.vol.readFile(e, out) catch |err| map(err, false);
+        return f.vol.readFile(e, out) catch |err| map(err, .looking);
     }
 
     pub fn write(f: *FatStore, path: []const u8, bytes: []const u8) Error!void {
         var pb: [store.max_parts][]const u8 = undefined;
         var jb: [path_bytes]u8 = undefined;
         const p = join(try store.checkPath(path, &pb, false), "", &jb);
-        f.vol.writeFile(p, bytes) catch |err| return map(err, true);
+        f.vol.writeFile(p, bytes) catch |err| return map(err, .writing);
     }
 
     pub fn append(f: *FatStore, path: []const u8, bytes: []const u8) Error!void {
         var pb: [store.max_parts][]const u8 = undefined;
         var jb: [path_bytes]u8 = undefined;
         const p = join(try store.checkPath(path, &pb, false), "", &jb);
-        const e = (try f.entryAt(p)) orelse return f.vol.writeFile(p, bytes) catch |err| map(err, true);
+        const e = (try f.entryAt(p)) orelse return f.vol.writeFile(p, bytes) catch |err| map(err, .writing);
         if (e.isDirectory()) return Error.IsDirectory;
-        f.vol.writeInto(p, e.size, bytes) catch |err| return map(err, true);
+        f.vol.writeInto(p, e.size, bytes) catch |err| return map(err, .writing);
     }
 
     pub fn remove(f: *FatStore, path: []const u8) Error!void {
@@ -119,7 +126,7 @@ pub const FatStore = struct {
         // disk_fat.remove refuses a directory (B22); a directory goes by removeTree.
         // Store removes files only.
         if (e.isDirectory()) return Error.IsDirectory;
-        f.vol.remove(p) catch |err| return map(err, false);
+        f.vol.remove(p) catch |err| return map(err, .looking);
     }
 
     pub fn replace(f: *FatStore, path: []const u8, bytes: []const u8) Error!void {
@@ -130,12 +137,12 @@ pub const FatStore = struct {
         const p = join(parts, "", &jb);
         if (try f.entryAt(p)) |e| if (e.isDirectory()) return Error.IsDirectory;
         const temp = join(parts, store.temp_prefix, &tb);
-        f.vol.writeFile(temp, bytes) catch |err| return map(err, true);
+        f.vol.writeFile(temp, bytes) catch |err| return map(err, .writing);
         // The new bytes on the media before the name that points at them.
         if (f.vol.blk.flush() != @import("virtio_blk.zig").blk_s_ok) return Error.Io;
         f.vol.rename(temp, p) catch |err| {
             f.vol.remove(temp) catch {};
-            return map(err, true);
+            return map(err, .writing);
         };
     }
 
@@ -149,8 +156,8 @@ pub const FatStore = struct {
             if (!e.isDirectory()) return Error.NotFound;
             cluster = e.first_cluster;
         }
-        var l = f.vol.lister(cluster) catch |err| return map(err, false);
-        while (l.next() catch |err| return map(err, false)) |e| {
+        var l = f.vol.lister(cluster) catch |err| return map(err, .looking);
+        while (l.next() catch |err| return map(err, .looking)) |e| {
             const name = e.text();
             if (store.hidden(name)) continue;
             each.call(each.context, .{ .name = name, .kind = if (e.isDirectory()) .directory else .file, .size = e.size });
