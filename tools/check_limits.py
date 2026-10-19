@@ -32,7 +32,10 @@ AG = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "..", "zig-webbox"
 
 def const(path: str, name: str) -> int:
     """The value of `[pub] const name[: T] = <int>[ - 1];` in `path`, or of
-    `max_tree_depth - 1` for a constant defined that way."""
+    `max_tree_depth - 1` for a constant defined that way, or of
+    `module.name` for one defined in a file `path` imports (`const module =
+    @import("file.zig");`), followed there: a constant moved to a split
+    file and named from where it was still reads."""
     text = open(path).read()
     m = re.search(rf"^\s*(?:pub\s+)?const\s+{name}\s*(?::\s*\w+)?\s*=\s*([^;]+);", text, re.M)
     if not m:
@@ -44,6 +47,11 @@ def const(path: str, name: str) -> int:
     m2 = re.fullmatch(r"(\w+)\s*-\s*(\d+)", expr)
     if m2:
         return const(path, m2.group(1)) - int(m2.group(2))
+    m3 = re.fullmatch(r"(\w+)\.(\w+)", expr)
+    if m3:
+        imp = re.search(rf'^\s*(?:pub\s+)?const\s+{m3.group(1)}\s*=\s*@import\("([^"]+\.zig)"\);', text, re.M)
+        if imp:
+            return const(os.path.join(os.path.dirname(path), imp.group(1)), m3.group(2))
     print(f"check_limits: `{name}` in {path} is `{expr}`, which this does not read")
     sys.exit(2)
 
