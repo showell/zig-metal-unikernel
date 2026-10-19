@@ -27,10 +27,16 @@ fn kernelModule(b: *std.Build, root: std.Build.LazyPath, optimize: std.builtin.O
     });
 }
 
-/// The one target: a 64-bit machine with no operating system, and no SSE,
-/// because a kernel that has not enabled it faults on the first xmm register
-/// the compiler reaches for -- and it reaches for them in memcpy unless told
-/// not to.
+/// The one target: a 64-bit machine with no operating system, and no SSE in
+/// the kernel's own code (soft float, no SIMD), because the kernel saves no
+/// SSE state on an interrupt or a switch: compiled for SSE, it would reach
+/// for xmm registers in memcpy unless told not to. **SSE is enabled all the
+/// same** (boot.zig sets CR4's OSFXSR and OSXMMEXCPT), so a linked object
+/// built for x86-64's baseline (SSE2, no AVX) runs: Dog Park's physics,
+/// compiled by Roc for its `x64v1elf` target; with the bits clear, its first
+/// SSE instruction is an invalid-opcode fault. Saving no state holds while
+/// that physics, run inside one handler at a time, is the only code that
+/// touches an SSE register.
 fn bareTarget(b: *std.Build) std.Build.ResolvedTarget {
     return b.resolveTargetQuery(.{
         .cpu_arch = .x86_64,

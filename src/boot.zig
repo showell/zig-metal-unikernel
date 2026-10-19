@@ -159,7 +159,7 @@ export fn _start() callconv(.naked) noreturn {
             \\  movl %eax, pdpt + 24
             \\  movl $0, pdpt + 28
             \\  movl %cr4, %eax
-            \\  orl $0x20, %eax          // PAE
+            \\  orl $0x620, %eax         // PAE; OSFXSR, OSXMMEXCPT: SSE runs (build.zig, `bareTarget`)
             \\  movl %eax, %cr4
             \\  movl $pml4, %eax
             \\  movl %eax, %cr3
