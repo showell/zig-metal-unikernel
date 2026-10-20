@@ -33,7 +33,7 @@ pub const Outcome = enum(u8) {
     short_answer = 10,
 
     pub fn code(o: Outcome) u8 {
-        return @intFromEnum(o);
+        return @backingInt(o);
     }
 };
 

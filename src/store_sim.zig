@@ -51,7 +51,7 @@ const paths = [_][]const u8{
     "data/chat/topic.md", "data/Chat/Topic.md", "data/chat/u.jsonl", "data/chat",
     "data",               "auth/7/session",     "data/x.md/under",   "data//chat/",
     "data/a:b",           "data/what?",         "data/trailing.",    "data/.~hidden",
-    "data/../a",          "",                   "a/b/c/d/e/f/g/h/i", "data/" ++ "n" ** 81,
+    "data/../a",          "",                   "a/b/c/d/e/f/g/h/i", "data/" ++ &@as([81]u8, @splat('n')),
 };
 
 /// The pool's other spellings of a name it also has: another case, or

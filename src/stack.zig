@@ -45,7 +45,7 @@ pub const guard: usize = 64 * 1024;
 ///
 /// 4096-aligned so the region starts on a page, which makes the addresses in a
 /// fault report easy to place.
-pub export var kernel_stack align(4096) = [_]u8{0} ** size;
+pub export var kernel_stack: [size]u8 align(4096) = @splat(0);
 
 pub const Usage = struct {
     /// The high-water mark: bytes between the top and the deepest word any
@@ -107,7 +107,7 @@ pub fn firstUnpainted(words: [*]const volatile u64, len: usize) usize {
 const testing = std.testing;
 
 fn fixture(comptime n: usize, written: []const usize) [n]u64 {
-    var w = [_]u64{paint} ** n;
+    var w: [n]u64 = @splat(paint);
     for (written) |i| w[i] = 0xDEAD_BEEF;
     return w;
 }
@@ -145,7 +145,7 @@ test "a fully written stack uses all of it" {
 
 test "an unpainted stack reads as fully used, never as empty" {
     // What the scan sees if the stub never ran: zeros are not paint.
-    var w = [_]u64{0} ** 8;
+    var w: [8]u64 = @splat(0);
     try testing.expectEqual(@as(usize, 64), used(&w, w.len));
 }
 

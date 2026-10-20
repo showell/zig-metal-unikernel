@@ -90,7 +90,7 @@ test "after is a walk forward of under half the circle" {
     var b: u16 = 0;
     while (b < 256) : (b += 1) {
         const base: u8 = @intCast(b);
-        var reached = [_]bool{false} ** 256;
+        var reached: [256]bool = @splat(false);
         var at: u8 = base;
         var steps: u16 = 1;
         while (steps < S8.half) : (steps += 1) {
@@ -107,7 +107,7 @@ test "within agrees with a walk of len steps from base" {
         const base: u8 = @intCast(b);
         var len: u16 = 0;
         while (len < 256) : (len += 1) {
-            var walked = [_]bool{false} ** 256;
+            var walked: [256]bool = @splat(false);
             var at: u8 = base;
             var n: u16 = 0;
             while (n < len) : (n += 1) {

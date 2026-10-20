@@ -682,8 +682,8 @@ test "the kernel's client against the kernel's server: 300 seeds of loss, duplic
     for (1..seed_count + 1) |seed| {
         var prng = std.Random.DefaultPrng.init(seed);
         const sc = Scenario.choose(prng.random());
-        kinds[@intFromEnum(sc.trouble)] += 1;
-        if (sc.fires) |f| fires[@intFromEnum(f)] += 1;
+        kinds[@backingInt(sc.trouble)] += 1;
+        if (sc.fires) |f| fires[@backingInt(f)] += 1;
         try runSeed(seed);
     }
     // The sweep holds every kind, and every deadline, several times.

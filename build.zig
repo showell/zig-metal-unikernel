@@ -59,7 +59,7 @@ pub fn build(b: *std.Build) void {
     // here is C — builds in a fraction of ReleaseSafe's time, with Debug's
     // safety checks. Commits are judged on ReleaseSafe.
     const dev = b.option(bool, "dev", "Debug kernels, for a fast rebuild while iterating") orelse false;
-    const optimize: std.builtin.OptimizeMode = if (dev) .Debug else .ReleaseSafe;
+    const optimize: std.builtin.OptimizeMode = if (dev) .debug else .safe;
     const copy = b.addUpdateSourceFiles();
 
     // One module for everything under src/, so a type from virtio.zig is the
@@ -76,7 +76,7 @@ pub fn build(b: *std.Build) void {
     // below, so an assertion in code nothing calls is still reported; every
     // module that compiles one of them imports both.
     const sdk = b.dependency("zig_coverage_sdk", .{});
-    pinnedSdk(b, sdk.builder.build_root.path orelse ".");
+    pinnedSdk(b, rootOf(sdk.builder));
     const coverage = sdk.module("coverage");
     coverage.red_zone = false;
     // The seed explorer (zig-coverage-sdk's explore.zig): simulators only.
@@ -128,19 +128,19 @@ pub fn build(b: *std.Build) void {
     // (Phase B step 2b: no copy): this repo holds the machine, not the code
     // it serves. -Dgopher-root=<dir> names another checkout.
     const gopher_root = b.option([]const u8, "gopher-root", "the angry-gopher checkout") orelse
-        b.pathFromRoot("../angry-gopher");
+        pathFromRoot(b, "../angry-gopher");
     const gopher_src = b.fmt("{s}/zig-server/src", .{gopher_root});
     // **THE LIBRARY**, webbox, from its own checkout (zig-webbox): the kernel
     // compiles its sources with this machine's `host_io`. -Dwebbox-root=<dir>
     // names another checkout.
     const webbox_root = b.option([]const u8, "webbox-root", "the zig-webbox checkout") orelse
-        b.pathFromRoot("../zig-webbox");
+        pathFromRoot(b, "../zig-webbox");
     const webbox_src = b.fmt("{s}/src", .{webbox_root});
     // **SHALE**, the script language an application runs on its own data,
     // from its own checkout (shale), compiled as webbox is, with this
     // machine's `host_io`. -Dshale-root=<dir> names another checkout.
     const shale_root = b.option([]const u8, "shale-root", "the shale checkout") orelse
-        b.pathFromRoot("../shale");
+        pathFromRoot(b, "../shale");
 
     const all = b.step("kernels", "every kernel");
     for (kernels) |k| {
@@ -190,7 +190,7 @@ pub fn build(b: *std.Build) void {
     const build_opts = b.addOptions();
     build_opts.addOption([]const u8, "commit", stampOf(b, stamp, gopher_root));
     const gm_opts = b.addOptions();
-    gm_opts.addOption([]const u8, "commit", stampOf(b, stamp, b.pathFromRoot(".")));
+    gm_opts.addOption([]const u8, "commit", stampOf(b, stamp, pathFromRoot(b, ".")));
     // **ON BY DEFAULT** (RESTART.md): a guest's reset restarts a real
     // droplet, measured 2026-10-03; -Drestart=false halts instead.
     gm_opts.addOption(bool, "restart", b.option(bool, "restart", "gopher.elf restarts on a failure while serving (RESTART.md; measured on a real droplet 2026-10-03); -Drestart=false halts instead") orelse true);
@@ -319,7 +319,7 @@ pub fn build(b: *std.Build) void {
     // asset list is its table. tools/verdicts.py says whether it is fresh, as
     // gates.sh asks it, and one not fresh fails the check.
     const port_state: []const u8 = blk: {
-        const out = b.runAllowFail(&.{ "env", b.fmt("GOPHER_ROOT={s}", .{gopher_root}), b.fmt("WEBBOX_ROOT={s}", .{webbox_root}), b.fmt("SHALE_CHECKOUT={s}", .{shale_root}), "python3", b.pathFromRoot("tools/verdicts.py"), "fresh" }, &port_code, .ignore) catch break :blk "tools/verdicts.py could not be run";
+        const out = b.runAllowFail(&.{ "env", b.fmt("GOPHER_ROOT={s}", .{gopher_root}), b.fmt("WEBBOX_ROOT={s}", .{webbox_root}), b.fmt("SHALE_CHECKOUT={s}", .{shale_root}), "python3", pathFromRoot(b, "tools/verdicts.py"), "fresh" }, &port_code, .ignore) catch break :blk "tools/verdicts.py could not be run";
         break :blk std.mem.trim(u8, out, " \t\r\n");
     };
     if (std.mem.eql(u8, port_state, "fresh")) {
@@ -353,7 +353,7 @@ pub fn build(b: *std.Build) void {
         .root_module = b.createModule(.{
             .root_source_file = b.path("native/serve.zig"),
             .target = b.graph.host,
-            .optimize = .Debug,
+            .optimize = .debug,
             .imports = &.{.{ .name = "netcore", .module = netcore }},
         }),
     });
@@ -363,7 +363,7 @@ pub fn build(b: *std.Build) void {
         .root_module = b.createModule(.{
             .root_source_file = b.path("native/fetch.zig"),
             .target = b.graph.host,
-            .optimize = .Debug,
+            .optimize = .debug,
             .imports = &.{.{ .name = "netcore", .module = netcore }},
         }),
     });
@@ -380,7 +380,7 @@ pub fn build(b: *std.Build) void {
         .root_module = b.createModule(.{
             .root_source_file = b.path("droplet/image.zig"),
             .target = b.graph.host,
-            .optimize = .Debug,
+            .optimize = .debug,
             .imports = &.{.{ .name = "kernel_partition", .module = kernel_partition }},
         }),
     });
@@ -409,7 +409,7 @@ pub fn build(b: *std.Build) void {
         // way the formatter writes it. It was let slip once (three files,
         // QUEUE.md item 10), and a separate step nobody runs would let it
         // slip again.
-        test_step.dependOn(&b.addFmt(.{ .paths = &.{"src"}, .check = true }).step);
+        test_step.dependOn(&b.addFmt(.{ .paths = &.{b.path("src")}, .check = true }).step);
         // **ONLY `fire` CHANGES A MACHINE'S STATE** (src/machine.zig): Zig
         // has no private fields, so tools/lint_machine.py is the guard.
         const lint_machine = b.addSystemCommand(&.{ "python3", "tools/lint_machine.py" });
@@ -501,8 +501,7 @@ pub fn build(b: *std.Build) void {
             .target = b.graph.host,
             .imports = &unit_imports,
         }) });
-        timed(unit, path);
-        test_step.dependOn(&b.addRunArtifact(unit).step);
+        test_step.dependOn(&runTest(unit, path).step);
         // disk_fat's lines run in the merged binary, or in its own.
         if (std.mem.eql(u8, path, "src/unit_tests.zig") or std.mem.eql(u8, path, "src/disk_fat.zig") or std.mem.eql(u8, path, "src/disk_fat_dirent.zig")) {
             for (fat_coverage) |run| run.addArtifactArg(unit);
@@ -605,7 +604,7 @@ pub fn build(b: *std.Build) void {
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/explore_bench.zig"),
             .target = b.graph.host,
-            .optimize = b.option(std.builtin.OptimizeMode, "explore-optimize", "how `explore` is compiled") orelse .ReleaseSafe,
+            .optimize = b.option(std.builtin.OptimizeMode, "explore-optimize", "how `explore` is compiled") orelse .safe,
             .imports = &.{
                 .{ .name = "explore_options", .module = explore_opts.createModule() },
                 .{ .name = "coverage", .module = coverage },
@@ -630,7 +629,7 @@ pub fn build(b: *std.Build) void {
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/explore_soak.zig"),
             .target = b.graph.host,
-            .optimize = .ReleaseSafe,
+            .optimize = .safe,
             .imports = &.{
                 .{ .name = "soak_options", .module = soak_opts.createModule() },
                 .{ .name = "coverage", .module = coverage },
@@ -675,7 +674,7 @@ pub fn build(b: *std.Build) void {
     // The floor (coverage/floor-sim.txt, COVERAGE.md): what the long tier
     // must reach. Unset, a MISS is reported and never fails the step.
     const floor = b.option([]const u8, "floor", "a coverage floor `properties` must reach (long.sh)");
-    props_opts.addOption([]const u8, "floor", if (floor) |f| b.pathFromRoot(f) else "");
+    props_opts.addOption([]const u8, "floor", if (floor) |f| pathFromRoot(b, f) else "");
     const props = b.addTest(.{
         .name = "properties",
         // Only the sweep: the files it imports carry tests of their own,
@@ -688,7 +687,7 @@ pub fn build(b: *std.Build) void {
             // is iterated on, and Debug builds in a fraction of the time. A
             // sweep is nearly all running, though, about three times slower in
             // Debug: long.sh asks for ReleaseSafe for its 10,000 seeds.
-            .optimize = b.option(std.builtin.OptimizeMode, "sweep-optimize", "how `properties` is built (Debug; long.sh: ReleaseSafe)") orelse .Debug,
+            .optimize = b.option(std.builtin.OptimizeMode, "sweep-optimize", "how `properties` is built (Debug; long.sh: ReleaseSafe)") orelse .debug,
             .imports = &.{
                 .{ .name = "tcp_properties_options", .module = props_opts.createModule() },
                 // ready_sim's rule (metal-vmm QUEUE 166), as the unit tests
@@ -711,7 +710,7 @@ pub fn build(b: *std.Build) void {
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/tcp_traces.zig"),
             .target = b.graph.host,
-            .optimize = .ReleaseSafe,
+            .optimize = .safe,
             .imports = &.{
                 .{ .name = "tcp_traces_options", .module = traces_opts.createModule() },
                 .{ .name = "coverage", .module = coverage },
@@ -755,7 +754,7 @@ pub fn build(b: *std.Build) void {
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/disk_fat_test.zig"),
             .target = b.graph.host,
-            .optimize = .Debug,
+            .optimize = .debug,
             .imports = &.{
                 .{ .name = "disk_fat_test_options", .module = disk_fat_opts.createModule() },
                 .{ .name = "coverage", .module = coverage },
@@ -764,8 +763,7 @@ pub fn build(b: *std.Build) void {
             },
         }),
     });
-    timed(disk_fat_unit, disk_fat_unit.name);
-    if (wanted(test_file, "src/disk_fat_test.zig")) test_step.dependOn(&b.addRunArtifact(disk_fat_unit).step);
+    if (wanted(test_file, "src/disk_fat_test.zig")) test_step.dependOn(&runTest(disk_fat_unit, disk_fat_unit.name).step);
     for (fat_coverage) |run| run.addArtifactArg(disk_fat_unit);
     // The stops and the lying disk (QUEUE.md items 79-80): hundreds of runs
     // each, so binaries of their own, run beside disk_fat_test's: one for the
@@ -787,7 +785,7 @@ pub fn build(b: *std.Build) void {
             .root_module = b.createModule(.{
                 .root_source_file = b.path("src/disk_fat_faults_test.zig"),
                 .target = b.graph.host,
-                .optimize = .Debug,
+                .optimize = .debug,
                 .imports = &.{
                     .{ .name = "disk_fat_test_options", .module = disk_fat_faults_opts },
                     .{ .name = "coverage", .module = coverage },
@@ -796,8 +794,7 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        timed(unit, name);
-        if (wanted(test_file, "src/disk_fat_faults_test.zig")) test_step.dependOn(&b.addRunArtifact(unit).step);
+        if (wanted(test_file, "src/disk_fat_faults_test.zig")) test_step.dependOn(&runTest(unit, name).step);
         for (fat_coverage) |run| run.addArtifactArg(unit);
     }
 
@@ -826,8 +823,7 @@ pub fn build(b: *std.Build) void {
                 },
             }),
         });
-        timed(unit, unit.name);
-        if (wanted(test_file, "src/tcp_test.zig")) test_step.dependOn(&b.addRunArtifact(unit).step);
+        if (wanted(test_file, "src/tcp_test.zig")) test_step.dependOn(&runTest(unit, unit.name).step);
         for (tcp_coverage) |run| run.addArtifactArg(unit);
     }
 }
@@ -835,12 +831,19 @@ pub fn build(b: *std.Build) void {
 /// -Dtest-cpu-dir, read where the test step is declared.
 var test_cpu_dir: ?[]const u8 = null;
 
-/// `unit`'s runs go through tools/cpu_time.py, which records its CPU time
-/// under `name` in -Dtest-cpu-dir; without the option, nothing changes.
-fn timed(unit: *std.Build.Step.Compile, name: []const u8) void {
-    const dir = test_cpu_dir orelse return;
+/// `unit`'s run, through tools/cpu_time.py, which records its CPU time
+/// under `name` in -Dtest-cpu-dir; without the option, the plain run.
+fn runTest(unit: *std.Build.Step.Compile, name: []const u8) *std.Build.Step.Run {
     const b = unit.step.owner;
-    unit.setExecCmd(&.{ "python3", b.pathFromRoot("tools/cpu_time.py"), b.pathFromRoot(dir), name, null });
+    const dir = test_cpu_dir orelse return b.addRunArtifact(unit);
+    const run = std.Build.Step.Run.create(b, b.fmt("run test {s}", .{unit.name}));
+    run.producer = unit;
+    run.addArgs(&.{ "python3", pathFromRoot(b, "tools/cpu_time.py"), pathFromRoot(b, dir), name });
+    run.addArtifactArg(unit);
+    // As addRunArtifact sets a test's run: the build speaks to the test
+    // runner over its stdin and stdout, which cpu_time.py passes through.
+    run.enableTestRunnerMode();
+    return run;
 }
 
 /// Whether `zig build test` runs `path`'s tests: all of them, or only
@@ -874,7 +877,7 @@ pub const App = struct {
 ///
 ///     const zmu = @import("zig_metal_unikernel");
 ///     const kernel = b.dependency("zig_metal_unikernel", .{});
-///     const elf = zmu.addAppKernel(b, kernel, .{ .name = "x.elf", .module = app, .assets = b.path("assets.zon"), .optimize = .ReleaseSafe });
+///     const elf = zmu.addAppKernel(b, kernel, .{ .name = "x.elf", .module = app, .assets = b.path("assets.zon"), .optimize = .safe });
 ///
 /// The kernel's parts stay the kernel's: probe/gopher.zig as the root, its
 /// link script and entry, and its `metal`, `host_io`, `webbox`, `shale`
@@ -912,7 +915,7 @@ fn appKernel(b: *std.Build, kb: *std.Build, a: App) *std.Build.Step.Compile {
     for (callers.keys(), callers.values()) |name, module| m.addImport(name, module);
     // A page embeds these by name, and a name that no build graph declared is
     // a compile error with a confusing message.
-    const assets_path = a.assets.getPath(b);
+    const assets_path = sourcePath(a.assets);
     const base = std.fs.path.dirname(assets_path) orelse ".";
     for (servedBy(b, assets_path).embedded) |e| {
         if (m.import_table.contains(e.name)) continue;
@@ -952,8 +955,9 @@ const Served = struct {
 fn servedBy(b: *std.Build, path: []const u8) Served {
     const io = b.graph.io;
     const text = std.Io.Dir.cwd().readFileAlloc(io, path, b.allocator, .limited(1 << 20)) catch return .{};
-    const z = b.allocator.dupeZ(u8, text) catch @panic("out of memory");
-    return std.zon.parse.fromSliceAlloc(Served, b.allocator, z, null, .{}) catch
+    const z = b.allocator.dupeSentinel(u8, text, 0) catch @panic("out of memory");
+    var diag: std.zon.parse.Diagnostics = undefined;
+    return std.zon.parse.fromSlice(Served, .{ .gpa = b.allocator, .arena = b.allocator, .source = z, .diagnostics = &diag }) catch
         std.process.fatal("{s} does not read as an application's assets (.embedded and .site)", .{path});
 }
 
@@ -990,7 +994,7 @@ fn commitOf(b: *std.Build, dir: []const u8) []const u8 {
 /// or not, stops the build and says the hash the checkout now has. Moving the
 /// SDK is moving this line, in the same commit as whatever needed the move.
 /// `-Dcoverage-sdk-unpinned` builds against anything, and says so.
-const coverage_sdk_pin = "d3ffd08ff15a350364108ae231b22aff85557e7363a435870283f41a5bcc33bc";
+const coverage_sdk_pin = "7fead85632b5b47399ac21fbf14ca3dcbd911e575748b3c40c1d21b9c17e72c3";
 
 /// The SDK's content hash, as the pin is made (above), in hex.
 fn sdkContent(b: *std.Build, sdk_path: []const u8) ![64]u8 {
@@ -1052,7 +1056,7 @@ const not_cataloged = [_]struct { file: []const u8, why: []const u8 }{
 
 fn catalogFiles(b: *std.Build) []const []const u8 {
     const io = b.graph.io;
-    var src = b.build_root.handle.openDir(io, "src", .{ .iterate = true }) catch |e|
+    var src = b.root.root_dir.handle.openDir(io, "src", .{ .iterate = true }) catch |e|
         std.process.fatal("src/ cannot be listed for the coverage catalog ({t})", .{e});
     defer src.close(io);
     var out: std.ArrayList([]const u8) = .empty;
@@ -1080,7 +1084,7 @@ fn catalogFiles(b: *std.Build) []const []const u8 {
 /// Stops the build when a `test "..."` in `path` contains none of `filters`:
 /// a test binary built with filters runs only the tests they name.
 fn everyTestFiltered(b: *std.Build, path: []const u8, filters: []const []const u8) void {
-    const text = b.build_root.handle.readFileAlloc(b.graph.io, path, b.allocator, .limited(1 << 22)) catch |e|
+    const text = b.root.root_dir.handle.readFileAlloc(b.graph.io, path, b.allocator, .limited(1 << 22)) catch |e|
         std.process.fatal("{s}: cannot be read to check its test names ({t})", .{ path, e });
     var it = std.mem.splitScalar(u8, text, '\n');
     while (it.next()) |line| {
@@ -1089,4 +1093,28 @@ fn everyTestFiltered(b: *std.Build, path: []const u8, filters: []const []const u
             if (std.mem.indexOf(u8, line, f) != null) break;
         } else std.process.fatal("{s}: a test no filter in build.zig names, so it would never run: {s}", .{ path, line });
     }
+}
+
+/// `builder`'s build root as an absolute path: 0.17's `b.root` may hold a
+/// relative one, and these paths are handed to other processes and builds.
+fn rootOf(builder: *std.Build) []const u8 {
+    return builder.root.root_dir.handle.realPathFileAlloc(builder.graph.io, builder.root.subPathOrDot(), builder.allocator) catch |e|
+        std.debug.panic("the build root {f}: {t}", .{ builder.root, e });
+}
+
+/// `sub` under this build's root, absolute (0.17 removed `b.pathFromRoot`).
+fn pathFromRoot(b: *std.Build, sub: []const u8) []const u8 {
+    return b.pathJoin(&.{ rootOf(b), sub });
+}
+
+/// A checked-in file's absolute path, for reading it while the build graph
+/// is made (0.17 removed `LazyPath.getPath`); a generated file has no path
+/// until its step runs.
+fn sourcePath(lp: std.Build.LazyPath) []const u8 {
+    return switch (lp) {
+        .src_path => |p| p.owner.pathJoin(&.{ rootOf(p.owner), p.sub_path }),
+        .dependency => |d| d.dependency.builder.pathJoin(&.{ rootOf(d.dependency.builder), d.sub_path }),
+        .cwd_relative => |p| p,
+        .generated, .relative => std.debug.panic("{f} is not a checked-in file, so it cannot be read before the build runs", .{lp}),
+    };
 }

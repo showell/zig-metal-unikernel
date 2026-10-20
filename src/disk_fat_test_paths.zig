@@ -447,9 +447,9 @@ test "a path through a file, too deep, or with no name, and a directory written 
         try d.expectFile("data/f", "a file");
         // Sixteen levels: the fifteen the check walks are made, the
         // sixteenth refused.
-        try testing.expectError(disk_fat.Error.BadName, d.vol.makePath("d/" ** 15 ++ "d"));
-        try testing.expect((try d.vol.open("d/" ** 14 ++ "d")).isDirectory());
-        try testing.expectError(disk_fat.Error.NotFound, d.vol.open("d/" ** 15 ++ "d"));
+        try testing.expectError(disk_fat.Error.BadName, d.vol.makePath(repeated("d/", 15) ++ "d"));
+        try testing.expect((try d.vol.open(repeated("d/", 14) ++ "d")).isDirectory());
+        try testing.expectError(disk_fat.Error.NotFound, d.vol.open(repeated("d/", 15) ++ "d"));
     }
 }
 
@@ -459,14 +459,14 @@ test "a tree deeper than removeTree walks is refused, and nothing in it is remov
         defer d.deinit();
         // Seventeen levels: makePath makes fifteen, the rest by hand, as
         // another program with no such limit would.
-        var dir = try d.vol.makePath("d/" ** 14 ++ "d");
+        var dir = try d.vol.makePath(repeated("d/", 14) ++ "d");
         dir = try d.vol.makeDirIn(dir, "d");
         dir = try d.vol.makeDirIn(dir, "d");
         try d.vol.writeFileIn(dir, "f", "deep");
         const before = d.free();
         try testing.expectError(disk_fat.Error.BadChain, d.vol.removeTree("d"));
         try testing.expectEqual(before, d.free());
-        try d.expectFile("d/" ** 17 ++ "f", "deep");
+        try d.expectFile(repeated("d/", 17) ++ "f", "deep");
         // Sixteen levels, counted from "d/d": within the walk.
         try d.vol.removeTree("d/d");
         try testing.expectError(disk_fat.Error.NotFound, d.vol.open("d/d"));
@@ -486,7 +486,7 @@ test "a read at an offset inside a sector, across sectors and clusters, answers 
             _ = pattern(&data, 13);
             // Another file between its two halves, so its chain breaks.
             try d.vol.writeFile("data/f", data[0..2500]);
-            try d.vol.writeFile("data/between", "x" ** 700);
+            try d.vol.writeFile("data/between", &@as([700]u8, @splat('x')));
             try d.vol.writeInto("data/f", 2500, data[2500..]);
             const e = try d.vol.open("data/f");
             var out: [5000]u8 = undefined;
@@ -589,8 +589,8 @@ test "a directory's name is held to the same length as a file's: one too long is
     for (configs) |cfg| {
         const d = try Disk.make("dir-name-length", cfg.shape, cfg.cached);
         defer d.deinit();
-        const longest = [_]u8{'d'} ** disk_fat.max_name;
-        const too_long = [_]u8{'d'} ** (disk_fat.max_name + 1);
+        const longest: [disk_fat.max_name]u8 = @splat('d');
+        const too_long: [disk_fat.max_name + 1]u8 = @splat('d');
         var path: [disk_fat.max_name + 8]u8 = undefined;
         const p = try std.fmt.bufPrint(&path, "data/{s}", .{&longest});
         const a = try d.vol.makePath(p);
@@ -1051,8 +1051,8 @@ test "a name of max_name is written and renamed to, one of max_name + 1 is refus
     for (configs) |cfg| {
         const d = try Disk.make("edge-name-length", cfg.shape, cfg.cached);
         defer d.deinit();
-        const longest = [_]u8{'n'} ** disk_fat.max_name;
-        const too_long = [_]u8{'n'} ** (disk_fat.max_name + 1);
+        const longest: [disk_fat.max_name]u8 = @splat('n');
+        const too_long: [disk_fat.max_name + 1]u8 = @splat('n');
         var path: [disk_fat.max_name + 8]u8 = undefined;
         try d.vol.writeFile(try std.fmt.bufPrint(&path, "data/{s}", .{&longest}), "longest");
         try d.expectFile(try std.fmt.bufPrint(&path, "data/{s}", .{&longest}), "longest");
@@ -1172,4 +1172,15 @@ test "a name's alias costs one listing however many of its directory's names sha
     const alone_reads = d.blk.requests - before_alone;
     try testing.expectEqualStrings("SESS~301MD ", &alike);
     try testing.expectEqual(alone_reads, alike_reads);
+}
+
+/// `s` repeated `n` times, built at comptime (Zig 0.17 removed `s ** n`).
+fn repeated(comptime s: []const u8, comptime n: usize) *const [s.len * n]u8 {
+    const out = comptime blk: {
+        var a: [s.len * n]u8 = undefined;
+        @setEvalBranchQuota(1000 + n);
+        for (0..n) |i| @memcpy(a[i * s.len ..][0..s.len], s);
+        break :blk a;
+    };
+    return &out;
 }

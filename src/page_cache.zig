@@ -481,7 +481,7 @@ test "memory that cannot be had leaves the file uncached, never a wrong copy" {
 test "a path too long to key is never kept" {
     const c = try make(1 << 20, 64 << 10);
     defer done(c);
-    const long = "data/" ++ "x" ** PageCache.max_key;
+    const long = "data/" ++ &@as([PageCache.max_key]u8, @splat('x'));
     c.put(long, "x");
     try testing.expect(c.get(long) == null);
     c.put("data/a", "a");
@@ -492,8 +492,8 @@ test "a path too long to key is never kept" {
 test "a key of max_key bytes is kept, and one of max_key + 1 is not" {
     const c = try make(1 << 20, 64 << 10);
     defer done(c);
-    const fits = "data/" ++ "x" ** (PageCache.max_key - 5);
-    const over = "data/" ++ "x" ** (PageCache.max_key - 4);
+    const fits = "data/" ++ &@as([PageCache.max_key - 5]u8, @splat('x'));
+    const over = "data/" ++ &@as([PageCache.max_key - 4]u8, @splat('x'));
     try testing.expectEqual(PageCache.max_key, fits.len);
     c.put(fits, "kept");
     c.put(over, "not");
@@ -505,11 +505,11 @@ test "a slash at the key's last byte, or just past it, leaves no room for the ne
     const c = try make(1 << 20, 64 << 10);
     defer done(c);
     // The slash at max_key - 2: one byte left, and the part takes it.
-    const fits = "x" ** (PageCache.max_key - 2) ++ "/y";
+    const fits = &@as([PageCache.max_key - 2]u8, @splat('x')) ++ "/y";
     // The slash at max_key - 1: the part would be the byte past the end.
-    const over = "x" ** (PageCache.max_key - 1) ++ "/y";
+    const over = &@as([PageCache.max_key - 1]u8, @splat('x')) ++ "/y";
     // A part filling the key: the slash itself does not fit.
-    const whole = "x" ** PageCache.max_key;
+    const whole = &@as([PageCache.max_key]u8, @splat('x'));
     c.put(fits, "kept");
     c.put(over, "not");
     c.put(whole, "kept too");

@@ -89,7 +89,7 @@ const plain: Facts = .{ .kept = false, .flushed = true, .timed_out = false, .spi
 
 fn with(comptime changes: anytype) Facts {
     var f = plain;
-    inline for (std.meta.fields(@TypeOf(changes))) |field| @field(f, field.name) = @field(changes, field.name);
+    inline for (comptime std.meta.fieldNames(@TypeOf(changes))) |field| @field(f, field) = @field(changes, field);
     return f;
 }
 

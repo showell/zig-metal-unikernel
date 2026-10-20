@@ -188,7 +188,7 @@ test "a FIFO port that stays full part-way counts exactly the bytes it dropped" 
     var f = FifoFake{ .full_after = 2 };
     defer f.sent.deinit(testing.allocator);
     var g = Gate{};
-    const text = [_]u8{'x'} ** 40;
+    const text: [40]u8 = @splat('x');
     g.send(&text, &f, 50);
     try testing.expectEqual(@as(usize, 32), f.sent.items.len);
     try testing.expect(g.dead);

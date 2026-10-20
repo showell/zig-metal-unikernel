@@ -246,7 +246,7 @@ pub fn putDos(out: *[4]u8, d: Dos) void {
 /// half only; `Volume.entryFrom` adds FAT32's high half.
 pub fn decode(e: []const u8) Entry {
     var out: Entry = .{
-        .name = [_]u8{0} ** 12,
+        .name = @splat(0),
         .name_len = 0,
         .short = e[0..11].*,
         .attr = e[11],
@@ -297,7 +297,7 @@ pub fn decode(e: []const u8) Entry {
 /// **FITTING IS NOT ENOUGH**: `api-key` fits and reads back as `API-KEY`.
 /// `needsLongName` decides, by whether the name reads back as itself.
 pub fn encode(name: []const u8) error{BadName}![11]u8 {
-    var out = [_]u8{' '} ** 11;
+    var out: [11]u8 = @splat(' ');
     var dot: usize = name.len;
     for (name, 0..) |c, i| {
         if (c == '.') dot = i;
@@ -439,7 +439,7 @@ test "on disk the time word comes first, then the date word" {
     // The two words swapped read back through our own decoder as a date and
     // pass every test above; this catches it.
     const when = Dos.fromUnix(1789641532);
-    var e = [_]u8{0} ** dirent_size;
+    var e: [dirent_size]u8 = @splat(0);
     putDos(e[22..26], when);
     try testing.expectEqual(when.time, le16(e[22..24]));
     try testing.expectEqual(when.date, le16(e[24..26]));
@@ -453,7 +453,7 @@ fn longEntriesFor(name: []const u8, sum: u8, out: [][32]u8) usize {
     var k: usize = 0;
     var seq: usize = parts;
     while (seq >= 1) : (seq -= 1) {
-        var e = [_]u8{0xFF} ** 32;
+        var e: [32]u8 = @splat(0xFF);
         e[0] = @intCast(seq);
         if (seq == parts) e[0] |= 0x40;
         e[11] = attr_long_name;
@@ -507,7 +507,7 @@ test "a last part whose thirteen characters run past max_name spoils the name, n
     // max_name, which no name this filesystem writes does.
     const seq: u8 = (max_name + 12) / 13;
     try testing.expect(@as(usize, seq) * 13 > max_name);
-    var e = [_]u8{0} ** 32;
+    var e: [32]u8 = @splat(0);
     e[0] = 0x40 | seq;
     e[11] = attr_long_name;
     e[13] = 0x5A;
@@ -535,7 +535,7 @@ test "LongName: a name of max_name characters reads back, one of max_name + 1 sp
 }
 
 test "longParts: 13·k characters fill k parts, 13·k + 1 need k + 1" {
-    const name = [_]u8{'x'} ** (13 * 3 + 1);
+    const name: [13 * 3 + 1]u8 = @splat('x');
     try testing.expectEqual(@as(u32, 0), longParts(name[0..0]));
     try testing.expectEqual(@as(u32, 1), longParts(name[0..1]));
     for (1..4) |k| {
@@ -563,7 +563,7 @@ test "LongName: 13·k and 13·k + 1 characters read back whole, the last part fu
 test "LongName: a part numbered (max_name + 12) / 13 is taken, one more spoils" {
     const top: u8 = (max_name + 12) / 13;
     for ([_]u8{ top, top + 1 }, [_]LongName.Stands{ .collecting, .spoiled }) |seq, want| {
-        var e = [_]u8{0} ** 32; // a 0x0000 first character: the part holds nothing
+        var e: [32]u8 = @splat(0); // a 0x0000 first character: the part holds nothing
         e[0] = 0x40 | seq;
         e[11] = attr_long_name;
         e[13] = 0x5A;
@@ -573,7 +573,7 @@ test "LongName: a part numbered (max_name + 12) / 13 is taken, one more spoils" 
     }
     // Numbered 1 is the first part; 0 is none.
     for ([_]u8{ 1, 0 }, [_]LongName.Stands{ .collecting, .spoiled }) |seq, want| {
-        var e = [_]u8{0} ** 32;
+        var e: [32]u8 = @splat(0);
         e[0] = 0x40 | seq;
         e[11] = attr_long_name;
         var long: LongName = .{};
@@ -598,7 +598,7 @@ test "encode: a base of 8 fits, 9 does not; an extension of 3 fits, 4 does not" 
 }
 
 test "decode: a full 8.3 field reads all twelve bytes, a short one trims at the last space" {
-    var e = [_]u8{0} ** dirent_size;
+    var e: [dirent_size]u8 = @splat(0);
     @memcpy(e[0..11], "ABCDEFGHXYZ");
     try testing.expectEqualStrings("ABCDEFGH.XYZ", decode(&e).alias());
     @memcpy(e[0..11], "ABCDEFG XY ");
@@ -640,7 +640,7 @@ test "LongName.close: a run counted down to part 1 puts its name, one stopped at
     // "abcdefghijklmno" is two parts; without part 1 its first thirteen
     // characters are whatever the buffer last held.
     var entries: [2][32]u8 = undefined;
-    var entry = decode(&([_]u8{' '} ** dirent_size));
+    var entry = decode(&(@as([dirent_size]u8, @splat(' '))));
     _ = longEntriesFor("abcdefghijklmno", shortChecksum(entry.short), &entries);
     for ([_]usize{ 2, 1 }, [_]bool{ true, false }) |taken, put| {
         var long: LongName = .{};

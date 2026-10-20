@@ -560,7 +560,7 @@ test "every operation stopped after every write leaves an outcome its doc names,
                 if (finished) try testing.expect(r.health.clean());
 
                 // The image as the next boot finds it, for the oracle.
-                for (r.found[0..r.len]) |f| outcome |= @as(u64, 1) << @intCast(@as(u32, 56) + @intFromEnum(f.problem));
+                for (r.found[0..r.len]) |f| outcome |= @as(u64, 1) << @intCast(@as(u32, 56) + @backingInt(f.problem));
                 if (keeps and d.images_dir.len > 0 and std.mem.indexOfScalar(u64, outcomes[0..outcomes_len], outcome) == null) {
                     outcomes[outcomes_len] = outcome;
                     outcomes_len += 1;
@@ -637,7 +637,7 @@ test "a request that fails before a write's commit gives back every cluster it t
     // points at those clusters, so nothing excuses keeping them. On FAT16,
     // where a new file's last request is its entry's write, the commit:
     // every request before it fails once, in turn.
-    const big = [_]u8{'b'} ** (3 * 512 + 100); // several clusters on the small shape
+    const big: [3 * 512 + 100]u8 = @splat('b'); // several clusters on the small shape
     for (configs) |cfg| {
         if (cfg.shape.kind != .fat16) continue;
         for ([_]bool{ false, true }) |grows| {
@@ -910,7 +910,7 @@ test "a write that lands and answers failure, its read-back failing too, while a
     // may land and answer failure, and the read that would say so fail too.
     // Taken for "not linked", the fresh cluster was given back while the
     // disk links it: the next allocation takes it, in two chains at once.
-    const big = [_]u8{'b'} ** (3 * 512 + 100);
+    const big: [3 * 512 + 100]u8 = @splat('b');
     for (configs) |cfg| {
         if (cfg.shape.kind != .fat16) continue;
         const d = try Disk.makeUnkept("limit-grow-twice", cfg.shape, cfg.cached);
@@ -951,7 +951,7 @@ test "a write that lands and answers failure, as an allocation links its chain, 
     // errdefer freed the chain the disk now links it into, freeing it again.
     // The disk ended right; "every cluster freed was in use" broke falsely.
     const coverage = @import("coverage");
-    const big = [_]u8{'b'} ** (6 * 512 + 100);
+    const big: [6 * 512 + 100]u8 = @splat('b');
     for (configs) |cfg| {
         if (cfg.shape.kind != .fat16) continue;
         const d = try Disk.makeUnkept("limit-link-lands", cfg.shape, cfg.cached);
@@ -999,7 +999,7 @@ test "a write that lands and answers failure, its read-back rotten: the kept fre
     // written (rot on the read-back; a weighing that trusted the second copy
     // and whose repair was refused), the count moved for the one entry
     // only, and was wrong after.
-    const big = [_]u8{'b'} ** (3 * 512 + 100);
+    const big: [3 * 512 + 100]u8 = @splat('b');
     for (configs) |cfg| {
         if (cfg.shape.kind != .fat16 or !cfg.cached) continue;
         const d = try Disk.makeUnkept("limit-read-back-rots", cfg.shape, cfg.cached);
@@ -1047,7 +1047,7 @@ test "a write that lands and answers failure, with the FAT on the disk and its r
     // A cluster was given back when a read-back said anything but what was
     // hoped; a rotted nonzero one sent freeChain into another file's chain.
     const coverage = @import("coverage");
-    const big = [_]u8{'b'} ** (6 * 512 + 100);
+    const big: [6 * 512 + 100]u8 = @splat('b');
     const d = try Disk.makeUnkept("limit-rot-on-disk", test_disk.small, false);
     defer d.deinit();
     try d.vol.writeFile("data/KEEP.DAT", &big); // another file's chain, nearby
@@ -1085,7 +1085,7 @@ test "a disk that lies (a write that lands nothing or half, a read of other byte
     const virtio_blk = @import("virtio_blk.zig");
     // What `Volume.check` found across every run, by problem: the boot's
     // disk check is where a lie that damaged the volume is seen.
-    var found = [_]u32{0} ** @typeInfo(disk_fat.Problem).@"enum".fields.len;
+    var found: [@typeInfo(disk_fat.Problem).@"enum".field_names.len]u32 = @splat(0);
     var runs: u32 = 0;
     for ([_]@FieldType(virtio_blk.Block.Fault, "kind"){ .lands_nothing, .torn, .garbage }) |lie| {
         for (stopped_ops) |op| {
@@ -1122,7 +1122,7 @@ test "a disk that lies (a write that lands nothing or half, a read of other byte
                     const Count = struct {
                         by: *@TypeOf(found),
                         fn each(c: *@This(), f: disk_fat.Finding) void {
-                            c.by[@intFromEnum(f.problem)] += 1;
+                            c.by[@backingInt(f.problem)] += 1;
                         }
                     };
                     const seen = try testing.allocator.alloc(u8, d.vol.checkBytes());
@@ -1154,9 +1154,9 @@ const LeakOp = struct {
     run: *const fn (v: *disk_fat.Volume) anyerror!void,
 };
 
-const leak_first = [_]u8{'a'} ** 600;
-const leak_long = [_]u8{0x4C} ** (300 * 512);
-const leak_more = [_]u8{'m'} ** (3 * 512 + 100);
+const leak_first: [600]u8 = @splat('a');
+const leak_long: [300 * 512]u8 = @splat(0x4C);
+const leak_more: [3 * 512 + 100]u8 = @splat('m');
 
 const leak_ops = [_]LeakOp{
     .{ .name = "a new file", .setup = struct {

@@ -565,7 +565,7 @@ pub fn kmain() noreturn {
 
     // ── the network ─────────────────────────────────────────────────────────
     rng.attach(&rng_mem);
-    const nic_base = virtio.findNth(virtio.device_id_net, @intFromEnum(conf.card)) orelse switch (conf.card) {
+    const nic_base = virtio.findNth(virtio.device_id_net, @backingInt(conf.card)) orelse switch (conf.card) {
         .public => serial.fail("no virtio-net device on the PCI bus or in any mmio slot"),
         .private => serial.fail("`card = private`, and this machine has no second network card"),
     };
@@ -1100,7 +1100,7 @@ fn serveOne(
         req.head.expect = null;
         webbox.edge.reject(&req, r.kind, r.msg) catch {};
         s.writer().flush() catch {};
-        const refused_status: u16 = @intFromEnum(webbox.edge.statusFor(r.kind));
+        const refused_status: u16 = @backingInt(webbox.edge.statusFor(r.kind));
         // Its method and path, so /admin/log's `path=` finds it (194.5).
         var refused_buf: [300]u8 = undefined;
         logRequest(number, wallMs(), metal.request_line.what(&refused_buf, @tagName(req.head.method), metal.log_ring.withoutQuery(req.head.target), true), r.msg[0 .. r.msg.len - 1], refused_status, null);

@@ -124,7 +124,7 @@ pub const Limit = enum(u64) {
     /// read — `.limited(4096)` for a name, `.limited(64)` for a counter. `of` is
     /// this machine's own older name for it, kept because the probes call it.
     pub fn limited(n: u64) Limit {
-        return @enumFromInt(n);
+        return @fromBackingInt(@intCast(n));
     }
     pub fn of(n: u64) Limit {
         return limited(n);
@@ -434,14 +434,14 @@ pub const Dir = struct {
         _ = ignored;
         const pc = pagesFor(sub_path);
         if (pc) |c| if (c.get(sub_path)) |kept| {
-            if (kept.len > @intFromEnum(limit)) return Error.StreamTooLong;
+            if (kept.len > @backingInt(limit)) return Error.StreamTooLong;
             const out = gpa.alloc(u8, kept.len) catch return Error.OutOfMemory;
             @memcpy(out, kept);
             return out;
         };
         const keepable = cacheable(sub_path);
         if (keepable) if (io_volumes.site_cache.find(sub_path)) |kept| {
-            if (kept.len > @intFromEnum(limit)) return Error.StreamTooLong;
+            if (kept.len > @backingInt(limit)) return Error.StreamTooLong;
             const out = gpa.alloc(u8, kept.len) catch return Error.OutOfMemory;
             @memcpy(out, kept);
             io_volumes.site_cache.hits += 1;
@@ -450,7 +450,7 @@ pub const Dir = struct {
         const v = try reading(sub_path);
         const e = try openEntry(v, sub_path);
         if (e.isDirectory()) return Error.IsDir;
-        if (e.size > @intFromEnum(limit)) return Error.StreamTooLong;
+        if (e.size > @backingInt(limit)) return Error.StreamTooLong;
 
         var out = gpa.alloc(u8, e.size) catch return Error.OutOfMemory;
         // A read that fails gives back what it took (metal-vmm QUEUE 172: the

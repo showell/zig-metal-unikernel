@@ -170,11 +170,11 @@ fn write64(at: usize, v: u64) void {
 }
 
 fn mmioRead(base: usize, reg: Reg) u32 {
-    return read32(base + @intFromEnum(reg));
+    return read32(base + @backingInt(reg));
 }
 
 fn mmioWrite(base: usize, reg: Reg, value: u32) void {
-    write32(base + @intFromEnum(reg), value);
+    write32(base + @backingInt(reg), value);
 }
 
 // ---- the operations, once per transport ----------------------------------
@@ -223,7 +223,7 @@ fn driverFeatures(d: Device, select: u32, value: u32) void {
 /// card's address.
 fn configAddress(d: Device, off: u32) usize {
     return switch (d) {
-        .mmio => |base| base + @intFromEnum(Reg.config) + off,
+        .mmio => |base| base + @backingInt(Reg.config) + off,
         .pci => |p| p.device + off,
     };
 }
@@ -458,7 +458,7 @@ pub fn Queue(comptime size: u16) type {
                     mmioWrite(base, .queue_device_lo, @truncate(used_addr));
                     mmioWrite(base, .queue_device_hi, @truncate(used_addr >> 32));
                     mmioWrite(base, .queue_ready, 1);
-                    doorbell = base + @intFromEnum(Reg.queue_notify);
+                    doorbell = base + @backingInt(Reg.queue_notify);
                 },
                 .pci => |p| {
                     write16(p.common + common_queue_select, index);

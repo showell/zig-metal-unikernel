@@ -693,7 +693,16 @@ pub fn pagesSeed(seed: u64) Failure!void {
     // The heap's own bitmap comes out of the region: `count` is what is left.
     const count_left = heap.count;
     if (a.rawAlloc((count_left + 1) * page, .fromByteUnits(page), 0) != null) return fail(seed, "more pages than the heap has were given", .{});
-    if (a.rawAlloc(page, .fromByteUnits(page * 64), 0) != null) return fail(seed, "an alignment past the heap was given", .{});
+    // A 64-page alignment: given exactly when such a page is in the heap,
+    // which depends on where the testing allocator put `mem`.
+    const wide = page * 64;
+    const aligned = std.mem.alignForward(usize, heap.base, wide);
+    const got = a.rawAlloc(page, .fromByteUnits(wide), 0);
+    if (aligned + page <= heap.base + heap.count * page) {
+        const p = got orelse return fail(seed, "an aligned page in the heap was not given", .{});
+        if (@intFromPtr(p) != aligned) return fail(seed, "an aligned page was given at {x}, not {x}", .{ @intFromPtr(p), aligned });
+        a.rawFree(p[0..page], .fromByteUnits(wide), 0);
+    } else if (got != null) return fail(seed, "an alignment past the heap was given", .{});
     var taken: usize = 0;
     while (a.rawAlloc(page, .fromByteUnits(page), 0)) |p| {
         const at = @intFromPtr(p);

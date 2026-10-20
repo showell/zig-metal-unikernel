@@ -91,7 +91,7 @@ test "a caching page as SBC-3 has it (0x12 bytes) is sent back with WCE and PS c
     var buf: [512]u8 = undefined;
     const got = answer(&buf, 8, 0x08, 0x12);
     try testing.expectEqual(@as(?u16, 28), selectList(&buf, got));
-    try testing.expectEqualSlices(u8, &[_]u8{0} ** 8, buf[0..8]);
+    try testing.expectEqualSlices(u8, &@as([8]u8, @splat(0)), buf[0..8]);
     try testing.expectEqual(@as(u8, 0x08), buf[8]); // PS cleared
     try testing.expectEqual(@as(u8, 0x12), buf[9]);
     try testing.expectEqual(@as(u8, 0), buf[10] & 0x04); // WCE cleared
@@ -196,7 +196,7 @@ pub fn senseOf(sense: []const u8) Sense {
 }
 
 test "sense in descriptor format is read as such: ILLEGAL REQUEST and UNIT ATTENTION are not NO SENSE (metal-vmm QUEUE 197.3)" {
-    var fixed = [_]u8{0} ** 18;
+    var fixed: [18]u8 = @splat(0);
     fixed[0] = 0x70;
     fixed[2] = 0x05; // ILLEGAL REQUEST
     fixed[12] = 0x20; // invalid command operation code
@@ -272,7 +272,7 @@ pub fn synced(good: bool, check_condition: bool, key: u8) Synced {
 }
 
 test "WCE is read from the caching page past any block descriptors, within what the disk sent (metal-vmm QUEUE 198.2)" {
-    var page = [_]u8{0} ** 40;
+    var page: [40]u8 = @splat(0);
     page[8] = 0x08;
     page[10] = 0x04;
     try std.testing.expectEqual(@as(?bool, true), wceOf(&page, 28));

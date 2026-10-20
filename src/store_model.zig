@@ -431,7 +431,7 @@ test "the model: a path the store refuses is refused before the model looks" {
     defer m.deinit();
     var out: [8]u8 = undefined;
     // What `store.checkPath` refuses, every operation refuses alike.
-    for ([_][]const u8{ "", "/", "a//b", "a/", "/a", "../x", ".~tmp", "a/b:c", "a/" ++ "x" ** (store.max_part + 1), "a/b/c/d/e/f/g/h/i" }) |bad| {
+    for ([_][]const u8{ "", "/", "a//b", "a/", "/a", "../x", ".~tmp", "a/b:c", "a/" ++ &@as([store.max_part + 1]u8, @splat('x')), "a/b/c/d/e/f/g/h/i" }) |bad| {
         try testing.expectError(Error.BadName, m.read(bad, &out));
         try testing.expectError(Error.BadName, m.write(bad, "x"));
         try testing.expectError(Error.BadName, m.append(bad, "x"));

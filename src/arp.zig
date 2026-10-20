@@ -151,7 +151,7 @@ pub fn writeRequest(out: []u8, mac: [6]u8, ip: [4]u8, target_ip: [4]u8) usize {
 /// long), for a machine that talks to one peer at a time.
 pub const Cache = struct {
     ip: [4]u8 = proto.ip_any,
-    mac: [6]u8 = .{0} ** 6,
+    mac: [6]u8 = @splat(0),
     known: bool = false,
 
     /// The hardware address of `ip`, if this is the entry for it.
@@ -196,7 +196,7 @@ test "a request asks the whole wire for the target's address, from us" {
     try std.testing.expectEqual(Op.request, p.op);
     try std.testing.expectEqualSlices(u8, &my_mac, &p.sender_mac);
     try std.testing.expectEqualSlices(u8, &my_ip, &p.sender_ip);
-    try std.testing.expectEqualSlices(u8, &[_]u8{0} ** 6, &p.target_mac);
+    try std.testing.expectEqualSlices(u8, &@as([6]u8, @splat(0)), &p.target_mac);
     try std.testing.expectEqualSlices(u8, &site_ip, &p.target_ip);
     // The server's half reads it as the request it always answered.
     const req = parseRequest(frame[0..n]).?;
@@ -224,16 +224,16 @@ test "a stale entry is replaced: the peer's new hardware address, or another pee
     cache.observe(.{ .op = .reply, .sender_mac = site_mac, .sender_ip = site_ip, .target_mac = my_mac, .target_ip = my_ip }, my_ip);
     // The site, now at another card, asking someone else: still the entry's
     // own address, so the entry follows it.
-    cache.observe(.{ .op = .request, .sender_mac = moved, .sender_ip = site_ip, .target_mac = .{0} ** 6, .target_ip = .{ 10, 0, 2, 2 } }, my_ip);
+    cache.observe(.{ .op = .request, .sender_mac = moved, .sender_ip = site_ip, .target_mac = @splat(0), .target_ip = .{ 10, 0, 2, 2 } }, my_ip);
     try std.testing.expectEqual(@as(?[6]u8, moved), cache.lookup(site_ip));
     // A stranger's packet about someone else teaches nothing.
     const stranger_ip = [4]u8{ 10, 0, 2, 20 };
     const stranger_mac = [6]u8{ 0x52, 0x54, 0, 0, 0, 0x20 };
-    cache.observe(.{ .op = .request, .sender_mac = stranger_mac, .sender_ip = stranger_ip, .target_mac = .{0} ** 6, .target_ip = .{ 10, 0, 2, 2 } }, my_ip);
+    cache.observe(.{ .op = .request, .sender_mac = stranger_mac, .sender_ip = stranger_ip, .target_mac = @splat(0), .target_ip = .{ 10, 0, 2, 2 } }, my_ip);
     try std.testing.expectEqual(@as(?[6]u8, moved), cache.lookup(site_ip));
     try std.testing.expectEqual(@as(?[6]u8, null), cache.lookup(stranger_ip));
     // The stranger asking for us replaces the one entry.
-    cache.observe(.{ .op = .request, .sender_mac = stranger_mac, .sender_ip = stranger_ip, .target_mac = .{0} ** 6, .target_ip = my_ip }, my_ip);
+    cache.observe(.{ .op = .request, .sender_mac = stranger_mac, .sender_ip = stranger_ip, .target_mac = @splat(0), .target_ip = my_ip }, my_ip);
     try std.testing.expectEqual(@as(?[6]u8, stranger_mac), cache.lookup(stranger_ip));
     try std.testing.expectEqual(@as(?[6]u8, null), cache.lookup(site_ip));
 }

@@ -134,7 +134,7 @@ const Bench = struct {
         io_mod.durable(); // the response's flush, as every answer ends
         var t: Tally = .{ .flushes = b.data.blk.flushes - flushes };
         for (b.seen.items) |s| {
-            const p = @intFromEnum(b.placeOf(s.lba));
+            const p = @backingInt(b.placeOf(s.lba));
             if (s.write) t.writes[p] += 1 else t.reads[p] += 1;
         }
         _ = b.arena.reset(.retain_capacity);

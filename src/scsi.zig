@@ -175,7 +175,7 @@ fn command(b: *virtio_blk.Block, at: Address, cdb: []const u8, dir: Direction, a
     if (b.refuseEnded()) return .{ .response = 0xFF, .status = 0xFF, .sense_key = 0, .asc = 0, .ascq = 0, .residual = 0 };
     const mem = b.scsi.?;
     pollEvents(b);
-    mem.request = .{ .lun = at.field(), .tag = 0, .task_attr = 0, .prio = 0, .crn = 0, .cdb = [_]u8{0} ** cdb_size };
+    mem.request = .{ .lun = at.field(), .tag = 0, .task_attr = 0, .prio = 0, .crn = 0, .cdb = @splat(0) };
     @memcpy(mem.request.cdb[0..cdb.len], cdb);
     mem.response.response = 0xFF; // so a device that writes nothing is not read as OK
     mem.response.status = 0xFF;

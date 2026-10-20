@@ -161,7 +161,7 @@ test "idle check: damage is counted, the first kind said" {
     const d = try test_disk.Disk.make("damaged-idle-check", test_disk.small32, true);
     defer d.deinit();
     try d.mount(true);
-    try d.vol.writeFile("short", "x" ** 1000);
+    try d.vol.writeFile("short", &@as([1000]u8, @splat('x')));
     const e = try d.vol.open("short");
     // The entry's size on the disk, past what its chain holds.
     std.mem.writeInt(u32, d.bytes[e.lba * test_disk.sector + e.slot + 28 ..][0..4], 5000, .little);

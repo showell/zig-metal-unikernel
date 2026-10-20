@@ -141,7 +141,7 @@ test "the same request twice asks for the same amount" {
     var seen: [3]usize = undefined;
     for (&seen) |*s| {
         var list: std.ArrayList(u8) = .empty;
-        try list.appendSlice(heap.allocator(), "a request's worth of work" ** 40);
+        try list.appendSlice(heap.allocator(), repeated("a request's worth of work", 40));
         _ = try heap.allocator().dupe(u8, list.items);
         s.* = heap.used;
         heap.reset();
@@ -175,4 +175,15 @@ test "a heap whose backing allocator has nothing does not preheat" {
     var heap = RequestHeap.init(nothing.allocator(), 4096);
     defer heap.deinit();
     try testing.expect(!heap.preheat());
+}
+
+/// `s` repeated `n` times, built at comptime (Zig 0.17 removed `s ** n`).
+fn repeated(comptime s: []const u8, comptime n: usize) *const [s.len * n]u8 {
+    const out = comptime blk: {
+        var a: [s.len * n]u8 = undefined;
+        @setEvalBranchQuota(1000 + n);
+        for (0..n) |i| @memcpy(a[i * s.len ..][0..s.len], s);
+        break :blk a;
+    };
+    return &out;
 }

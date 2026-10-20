@@ -648,7 +648,7 @@ pub fn aliasFor(self: *Volume, dir_cluster: Cluster, name: []const u8) Error![11
     // names sharing their first six characters.
     const Taken = struct {
         name: []const u8,
-        n: std.StaticBitSet(1000) = .initEmpty(),
+        n: std.StaticBitSet(1000) = .empty,
         fn each(t: *@This(), e: Entry) void {
             // Each `~` in the 8-character part may start the tail: the
             // name's own characters can hold one too.
@@ -676,7 +676,7 @@ pub fn aliasFor(self: *Volume, dir_cluster: Cluster, name: []const u8) Error![11
 /// dots and spaces, as many as fit before the tail (`~9` keeps six, `~10`
 /// five), upper-cased; the extension from its last dot.
 pub fn aliasCandidate(name: []const u8, n: u32) [11]u8 {
-    var short = [_]u8{' '} ** 11;
+    var short: [11]u8 = @splat(' ');
 
     var tail: [4]u8 = undefined;
     var tail_len: usize = 1;

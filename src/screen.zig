@@ -198,8 +198,8 @@ test "a full row followed by its newline is one row, not two" {
     fresh(&memory);
     defer on = false;
 
-    put("x" ** columns ++ "\nnext\n");
+    put(&@as([columns]u8, @splat('x')) ++ "\nnext\n");
     var text: [columns]u8 = undefined;
-    try std.testing.expectEqualStrings("x" ** columns, rowText(0, &text));
+    try std.testing.expectEqualStrings(&@as([columns]u8, @splat('x')), rowText(0, &text));
     try std.testing.expectEqualStrings("next", rowText(1, &text));
 }

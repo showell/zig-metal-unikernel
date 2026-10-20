@@ -235,9 +235,9 @@ const Promise = enum { old_or_new, old_new_or_neither };
 /// finishes uncut. After each, the next boot's mount must find what
 /// `promise` allows, and the new file if the operation answered.
 fn cutEverywhere(comptime which: enum { replace, write, append }, promise: Promise, torn: bool) !usize {
-    const old = "the old file, " ** 120;
-    const added = "and what was added to it. " ** 80;
-    const new = if (which == .append) old ++ added else "the whole new file, " ** 150;
+    const old = repeated("the old file, ", 120);
+    const added = repeated("and what was added to it. ", 80);
+    const new = if (which == .append) old ++ added else repeated("the whole new file, ", 150);
     var cuts: usize = 0;
     var j: u64 = 0;
     while (true) : (j += 1) {
@@ -327,8 +327,8 @@ test "replace: its flush puts the new bytes on the media before the name that po
     const c = try test_disk.Cache.attach(d);
     defer c.detach(d);
     var f = FatStore{ .vol = &d.vol };
-    const old = "the old file, " ** 120;
-    const new = "the whole new file, " ** 150;
+    const old = repeated("the old file, ", 120);
+    const new = repeated("the whole new file, ", 150);
     try f.store_().write("f.md", old);
     try testing.expectEqual(@import("virtio_blk.zig").blk_s_ok, d.blk.flush());
     try f.store_().replace("f.md", new);
@@ -366,7 +366,7 @@ test "replace: a rename that fails takes its hidden copy back, and every cluster
         for (0..freed) |k| try s.remove(try std.fmt.bufPrint(&name, "F{d:0>4}", .{made - 1 - k}));
         const free = d.free();
         const writes = d.blk.writes;
-        const answered = s.replace("new.md", "the new file's bytes, " ** 100);
+        const answered = s.replace("new.md", repeated("the new file's bytes, ", 100));
         if (answered) |_| break else |e| try testing.expectEqual(Error.NoSpace, e);
         // The copy was written (it took clusters), so the refusal came from
         // the rename.
@@ -407,12 +407,12 @@ test "the deepest, longest path a Store takes works on FAT as in the model; one 
     var f = FatStore{ .vol = &d.vol };
     var m = Model.init(testing.allocator);
     defer m.deinit();
-    const part = "p" ** store.max_part;
+    const part = &@as([store.max_part]u8, @splat('p'));
     // max_parts parts of max_part bytes: replace's hidden name on the last
     // is temp_prefix longer, within disk_fat's max_name.
-    const deepest = (part ++ "/") ** (store.max_parts - 1) ++ part;
+    const deepest = repeated(part ++ "/", store.max_parts - 1) ++ part;
     const too_deep = deepest ++ "/x";
-    const too_long = (part ++ "/") ** (store.max_parts - 1) ++ part ++ "p";
+    const too_long = repeated(part ++ "/", store.max_parts - 1) ++ part ++ "p";
     var buf: [32]u8 = undefined;
     for ([_]store.Store{ m.store_(), f.store_() }) |s| {
         try s.write(deepest, "written");
@@ -444,4 +444,15 @@ test "a volume refusing writes is the Store's Io on every write, never Damaged, 
     try testing.expectEqualStrings("a file", buf[0..n]);
     d.vol.writes = .taken;
     try s.replace("data/a", "taken");
+}
+
+/// `s` repeated `n` times, built at comptime (Zig 0.17 removed `s ** n`).
+fn repeated(comptime s: []const u8, comptime n: usize) *const [s.len * n]u8 {
+    const out = comptime blk: {
+        var a: [s.len * n]u8 = undefined;
+        @setEvalBranchQuota(1000 + n);
+        for (0..n) |i| @memcpy(a[i * s.len ..][0..s.len], s);
+        break :blk a;
+    };
+    return &out;
 }

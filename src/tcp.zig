@@ -2052,13 +2052,14 @@ test "tcp: the host page's line says every count the table keeps, each by its ow
             return 1;
         }
     }.f;
-    var t = Table.init(.{ 10, 0, 0, 1 }, .{0} ** 6, 80, &conns, &out, isn);
+    var t = Table.init(.{ 10, 0, 0, 1 }, @splat(0), 80, &conns, &out, isn);
     // Each counter a value of its own, from the table's own fields, so a
     // counter added later and left off the line fails here.
     comptime var n: u64 = 1001;
-    inline for (@typeInfo(Table).@"struct".fields) |f| {
-        if (f.type == u64) {
-            @field(t, f.name) = n;
+    const info = @typeInfo(Table).@"struct";
+    inline for (info.field_names, info.field_types) |name, ty| {
+        if (ty == u64) {
+            @field(t, name) = n;
             n += 1;
         }
     }

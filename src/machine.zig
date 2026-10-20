@@ -55,11 +55,11 @@ pub fn Machine(comptime spec: anytype) type {
     // **A SPEC SAYS WHAT IT MEANS, OR DOES NOT COMPILE** (144's review): an
     // unknown key (`.group` for `.groups`) would be ignored, and Group
     // without groups would place every state in none.
-    comptime for (std.meta.fields(Spec)) |f| {
+    comptime for (std.meta.fieldNames(Spec)) |f| {
         const known = [_][]const u8{ "name", "State", "Event", "Group", "initial", "edges", "groups" };
         for (known) |k| {
-            if (std.mem.eql(u8, k, f.name)) break;
-        } else @compileError("machine " ++ name ++ ": no spec key ." ++ f.name ++ " (name, State, Event, Group, initial, edges, groups)");
+            if (std.mem.eql(u8, k, f)) break;
+        } else @compileError("machine " ++ name ++ ": no spec key ." ++ f ++ " (name, State, Event, Group, initial, edges, groups)");
     };
     if (@hasField(Spec, "Group") != @hasField(Spec, "groups")) @compileError("machine " ++ name ++ ": .Group and .groups come together: the groups, and where each state is in them");
     const State: type = spec.State;
@@ -75,12 +75,12 @@ pub fn Machine(comptime spec: anytype) type {
     };
     const groups: Membership(State, Group) = comptime blk: {
         var m: Membership(State, Group) = undefined;
-        if (@hasField(Spec, "groups")) for (std.meta.fields(@TypeOf(spec.groups))) |f| {
-            if (!@hasField(State, f.name)) @compileError("machine " ++ name ++ ": .groups names " ++ f.name ++ ", which is no state");
+        if (@hasField(Spec, "groups")) for (std.meta.fieldNames(@TypeOf(spec.groups))) |f| {
+            if (!@hasField(State, f)) @compileError("machine " ++ name ++ ": .groups names " ++ f ++ ", which is no state");
         };
-        for (std.meta.fields(State)) |f| {
-            if (@hasField(Spec, "groups") and !@hasField(@TypeOf(spec.groups), f.name)) @compileError("machine " ++ name ++ ": .groups leaves out the state " ++ f.name ++ "; every state says its groups, &.{} for none");
-            @field(m, f.name) = if (@hasField(Spec, "groups")) @field(spec.groups, f.name) else &.{};
+        for (std.meta.fieldNames(State)) |f| {
+            if (@hasField(Spec, "groups") and !@hasField(@TypeOf(spec.groups), f)) @compileError("machine " ++ name ++ ": .groups leaves out the state " ++ f ++ "; every state says its groups, &.{} for none");
+            @field(m, f) = if (@hasField(Spec, "groups")) @field(spec.groups, f) else &.{};
         }
         break :blk m;
     };

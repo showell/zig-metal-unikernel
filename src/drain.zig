@@ -716,7 +716,7 @@ test "a drain's deadline: its last nanosecond waits, the deadline itself is late
 }
 
 test "a body waited for in the buffer: its last nanosecond waits, the deadline is late, and a body whole by then is served" {
-    const req = try request("/x", 100, "", "a" ** 100);
+    const req = try request("/x", 100, "", &@as([100]u8, @splat('a')));
     defer testing.allocator.free(req);
     var d: TestDrains = .{ .gpa = testing.allocator, .limit = caps };
     var c: Client = .{ .i = 0, .serial = 1, .bytes = req, .sent = headLen(req) + 10 };
@@ -791,7 +791,7 @@ test "a chunked drain exactly what is kept of one ends whole; one byte more is 4
 }
 
 test "a chunk ending at the buffer's edge: parsed once, then the rest; the last CRLF's last byte is the end" {
-    const chunk = "400\r\n" ++ "k" ** 0x400 ++ "\r\n";
+    const chunk = "400\r\n" ++ &@as([0x400]u8, @splat('k')) ++ "\r\n";
     const body = chunk ++ chunk ++ chunk ++ "0\r\n\r\n";
     const req = try request("/x", null, "", body);
     defer testing.allocator.free(req);

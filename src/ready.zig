@@ -280,8 +280,8 @@ test "a body that exactly fills the buffer behind its head is waited for; one by
     try testing.expectEqual(Readiness.body_coming, ask(head_fits, false, capacity));
     try testing.expectEqual(Readiness.drain, ask(head_over, false, capacity));
     // And the one that fits, arrived whole, fills the buffer to the byte.
-    try testing.expectEqual(Readiness.ready, ask(head_fits ++ "v" ** 64, false, capacity));
-    try testing.expectEqual(Readiness.body_coming, ask(head_fits ++ "v" ** 63, false, capacity));
+    try testing.expectEqual(Readiness.ready, ask(head_fits ++ &@as([64]u8, @splat('v')), false, capacity));
+    try testing.expectEqual(Readiness.body_coming, ask(head_fits ++ &@as([63]u8, @splat('v')), false, capacity));
 }
 
 test "a head ending at the buffer's last byte is a request; one byte short of its end, it is served unended" {

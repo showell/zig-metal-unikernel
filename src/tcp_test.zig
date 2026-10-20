@@ -340,7 +340,7 @@ test "the window is the room left, and reading gives it back" {
     const i = try p.connect(&f.table, &f.wire, 1);
     try testing.expectEqual(@as(u16, 64), f.wire.last().window);
 
-    _ = p.write(&f.table, &f.wire, "0123456789" ** 4, 2);
+    _ = p.write(&f.table, &f.wire, repeated("0123456789", 4), 2);
     try testing.expectEqual(@as(u16, 24), f.wire.last().window);
 
     f.table.conns[i].consume(40);
@@ -353,7 +353,7 @@ test "a window that reopens is said again until the peer sends" {
     f.init();
     var p = Peer{ .ip = .{ 10, 0, 2, 2 }, .port = 40000 };
     const i = try p.connect(&f.table, &f.wire, 0);
-    _ = p.write(&f.table, &f.wire, "0123456789" ** 6, 1);
+    _ = p.write(&f.table, &f.wire, repeated("0123456789", 6), 1);
     try testing.expectEqual(@as(u16, 4), f.wire.last().window); // shut, as far as the peer can tell
 
     // The reader takes it all and says so; say that announcement is lost.
@@ -381,7 +381,7 @@ test "a reader that makes room without saying so is announced for it" {
     f.init();
     var p = Peer{ .ip = .{ 10, 0, 2, 2 }, .port = 40000 };
     const i = try p.connect(&f.table, &f.wire, 0);
-    _ = p.write(&f.table, &f.wire, "0123456789" ** 6, 1);
+    _ = p.write(&f.table, &f.wire, repeated("0123456789", 6), 1);
     f.table.conns[i].consume(60);
     const from = f.wire.count;
     transmit(&f.table, &f.wire, 2);
@@ -394,7 +394,7 @@ test "a peer with nothing more to say is told a bounded number of times" {
     f.init();
     var p = Peer{ .ip = .{ 10, 0, 2, 2 }, .port = 40000 };
     const i = try p.connect(&f.table, &f.wire, 0);
-    _ = p.write(&f.table, &f.wire, "0123456789" ** 6, 1);
+    _ = p.write(&f.table, &f.wire, repeated("0123456789", 6), 1);
     f.table.conns[i].consume(60);
     f.table.ack(&f.wire, i);
     var now: i96 = 2;
@@ -408,7 +408,7 @@ test "a segment bigger than the room is taken in part, and the rest arrives afte
     f.init();
     var p = Peer{ .ip = .{ 10, 0, 2, 2 }, .port = 40000 };
     const i = try p.connect(&f.table, &f.wire, 1);
-    const body = "abcdefghij" ** 10; // 100 bytes into a 64-byte buffer
+    const body = repeated("abcdefghij", 10); // 100 bytes into a 64-byte buffer
 
     var buf: [1600]u8 = undefined;
     const first = p.seq;
@@ -3040,4 +3040,15 @@ test "what is held moves with the buffer when the reader's bytes are let go" {
     c.consume(c.pending().len);
     _ = sendAt(&f, &p, 9, flag_ack, "then", 5 * ms);
     try testing.expectEqualStrings("thenLATER", c.pending());
+}
+
+/// `s` repeated `n` times, built at comptime (Zig 0.17 removed `s ** n`).
+fn repeated(comptime s: []const u8, comptime n: usize) *const [s.len * n]u8 {
+    const out = comptime blk: {
+        var a: [s.len * n]u8 = undefined;
+        @setEvalBranchQuota(1000 + n);
+        for (0..n) |i| @memcpy(a[i * s.len ..][0..s.len], s);
+        break :blk a;
+    };
+    return &out;
 }

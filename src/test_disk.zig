@@ -726,9 +726,9 @@ test "a restored mount is a fresh mount (198.12)" {
             try d.mount(cached);
             // Field by field, a pointer by where it points: the volume's
             // pointers are into this `Disk`, the same before and after.
-            inline for (@typeInfo(disk_fat.Volume).@"struct".fields) |f| {
-                if (!std.meta.eql(@field(d.vol, f.name), @field(restored, f.name))) {
-                    std.debug.print("restored, the volume's {s} is not a fresh mount's\n", .{f.name});
+            inline for (comptime std.meta.fieldNames(disk_fat.Volume)) |name| {
+                if (!std.meta.eql(@field(d.vol, name), @field(restored, name))) {
+                    std.debug.print("restored, the volume's {s} is not a fresh mount's\n", .{name});
                     return error.TestUnexpectedResult;
                 }
             }

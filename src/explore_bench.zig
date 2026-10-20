@@ -132,7 +132,7 @@ pub fn main(init: std.process.Init) !void {
         var unfaithful: [3]u32 = .{ 0, 0, 0 };
         for (0..seeds) |k| {
             inline for (comptime std.enums.values(Column)) |column| {
-                const c = @intFromEnum(column);
+                const c = @backingInt(column);
                 var report = try runOnce(gpa, budget, options.seed + k, column);
                 failures[c] += @intCast(report.failures.items.len);
                 unfaithful[c] += report.unfaithful;

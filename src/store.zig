@@ -214,20 +214,31 @@ test "paths: an empty part refused, FAT's rules kept, the Store's prefix refused
         try testing.expectError(Error.BadName, checkPath(bad, &buf, false));
     }
     try testing.expectEqual(@as(usize, 0), (try checkPath("", &buf, true)).len);
-    try testing.expectError(Error.BadName, checkPart("x" ** (max_part + 1)));
-    try checkPart("x" ** max_part);
+    try testing.expectError(Error.BadName, checkPart(&@as([max_part + 1]u8, @splat('x'))));
+    try checkPart(&@as([max_part]u8, @splat('x')));
 }
 
 test "paths: max_parts parts are a path, max_parts + 1 are not; a part of max_part is a name, max_part + 1 is not" {
     var buf: [max_parts][]const u8 = undefined;
-    const deepest = "a/" ** (max_parts - 1) ++ "a";
+    const deepest = repeated("a/", max_parts - 1) ++ "a";
     try testing.expectEqual(@as(usize, max_parts), (try checkPath(deepest, &buf, false)).len);
     try testing.expectError(Error.BadName, checkPath(deepest ++ "/a", &buf, false));
     try testing.expectError(Error.BadName, checkPath(deepest ++ "/a", &buf, true));
-    const longest = "x" ** max_part;
+    const longest = &@as([max_part]u8, @splat('x'));
     try testing.expectEqual(@as(usize, 2), (try checkPath("data/" ++ longest, &buf, false)).len);
     try testing.expectError(Error.BadName, checkPath("data/" ++ longest ++ "x", &buf, false));
     // A part of one byte is a name; of none, a path built wrong.
     try checkPart("x");
     try testing.expectError(Error.BadName, checkPart(""));
+}
+
+/// `s` repeated `n` times, built at comptime (Zig 0.17 removed `s ** n`).
+fn repeated(comptime s: []const u8, comptime n: usize) *const [s.len * n]u8 {
+    const out = comptime blk: {
+        var a: [s.len * n]u8 = undefined;
+        @setEvalBranchQuota(1000 + n);
+        for (0..n) |i| @memcpy(a[i * s.len ..][0..s.len], s);
+        break :blk a;
+    };
+    return &out;
 }

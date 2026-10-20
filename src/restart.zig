@@ -94,7 +94,7 @@ pub const Record = struct {
         b[0] = magic;
         b[1] = r.count;
         std.mem.writeInt(u32, b[2..6], r.at orelse unknown_time, .little);
-        b[6] = @intFromEnum(r.reason);
+        b[6] = @backingInt(r.reason);
         b[7] = checksum(b[0..7]);
         return b;
     }
@@ -116,7 +116,7 @@ pub const Record = struct {
             return null;
         }
         const at = std.mem.readInt(u32, b[2..6], .little);
-        return .{ .count = b[1], .at = if (at == unknown_time) null else at, .reason = @enumFromInt(b[6]) };
+        return .{ .count = b[1], .at = if (at == unknown_time) null else at, .reason = @fromBackingInt(@intCast(b[6])) };
     }
 };
 

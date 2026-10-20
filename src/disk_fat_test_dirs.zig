@@ -174,7 +174,7 @@ test "an append to a file within a cluster of 4 GiB answers TooBig past it, not 
         const at = e.lba * test_disk.sector + e.slot + 28;
         std.mem.writeInt(u32, d.bytes[at..][0..4], 0xFFFF_FF9C, .little);
         try d.mount(cached);
-        try testing.expectError(disk_fat.Error.TooBig, d.vol.writeInto("data/x", 0xFFFF_FF9C, "x" ** 101));
+        try testing.expectError(disk_fat.Error.TooBig, d.vol.writeInto("data/x", 0xFFFF_FF9C, &@as([101]u8, @splat('x'))));
         // Within the limit it gets past the sizes and meets the short chain.
         try testing.expect(std.meta.isError(d.vol.writeInto("data/x", 0xFFFF_FF9C, "more")));
     }
@@ -266,7 +266,7 @@ test "a path through a file names nothing, whatever the file's bytes spell" {
         defer d.deinit();
         // A file whose first 32 bytes are a directory entry for "X", a file
         // of 5 bytes at cluster 2: what a walk through it would find.
-        var bytes = [_]u8{0} ** 64;
+        var bytes: [64]u8 = @splat(0);
         @memcpy(bytes[0..11], "X          ");
         bytes[11] = 0x20;
         bytes[26] = 2;
@@ -518,15 +518,15 @@ test "a file ending inside a sector leaves zeros past its end, not what a file b
     for (configs) |cfg| {
         const d = try Disk.make("f6-tail", cfg.shape, cfg.cached);
         defer d.deinit();
-        try d.vol.writeFile("data/old", "Y" ** 1500);
+        try d.vol.writeFile("data/old", &@as([1500]u8, @splat('Y')));
         const old = (try d.vol.open("data/old")).first_cluster;
         try d.vol.remove("data/old");
-        try d.vol.writeFile("data/new", "x" ** 10); // the freed cluster, first
+        try d.vol.writeFile("data/new", &@as([10]u8, @splat('x'))); // the freed cluster, first
         const e = try d.vol.open("data/new");
         try testing.expectEqual(old, e.first_cluster);
         const l = Layout.of(d.bytes);
         const at = (l.data_sector + (e.first_cluster - 2) * d.bytes[13]) * test_disk.sector;
-        try testing.expectEqualStrings("x" ** 10, d.bytes[at..][0..10]);
+        try testing.expectEqualStrings(&@as([10]u8, @splat('x')), d.bytes[at..][0..10]);
         try testing.expect(std.mem.allEqual(u8, d.bytes[at + 10 ..][0 .. test_disk.sector - 10], 0));
     }
 }
@@ -686,7 +686,7 @@ test "the kept free count follows every operation, the refused and failed ones i
         try d.expectKept();
         try testing.expectError(disk_fat.Error.BadChain, d.vol.writeInto("data/b", 5000, "hole"));
         try d.expectKept();
-        try testing.expectError(disk_fat.Error.BadName, d.vol.writeFile("x" ** (disk_fat.max_name + 1), "x"));
+        try testing.expectError(disk_fat.Error.BadName, d.vol.writeFile(&@as([disk_fat.max_name + 1]u8, @splat('x')), "x"));
         try d.expectKept();
         _ = try d.vol.makePath("data/deep/er/still");
         try d.expectKept();

@@ -524,7 +524,7 @@ const Sim = struct {
                 // A name past the longest FAT keeps, or none at all.
                 // In a directory that is there: making one could find no room.
                 const dir = (if (r.boolean()) s.someDir(r) else null) orelse "";
-                const name = if (r.boolean()) "x" ** (disk_fat.max_name + 1) else "";
+                const name = if (r.boolean()) &@as([disk_fat.max_name + 1]u8, @splat('x')) else "";
                 const path = join(dir, name, &buf);
                 if (vol.writeFile(path, "never")) return s.fault("a write with no name, or too long a one, succeeded") else |e| if (e != E.BadName) return s.fault(@errorName(e));
             },

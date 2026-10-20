@@ -101,7 +101,7 @@ test "a path makes its directories, and names of every length up to max_name rea
 test "a name longer than max_name is refused, not truncated" {
     const d = try Disk.make("toolong", small, true);
     defer d.deinit();
-    const long = "a" ** (disk_fat.max_name + 1);
+    const long = &@as([disk_fat.max_name + 1]u8, @splat('a'));
     try testing.expectError(disk_fat.Error.BadName, d.vol.writeFile(long, "x"));
 }
 
@@ -663,9 +663,9 @@ test "the check finds a file whose size and chain disagree" {
         const shape, const cached = .{ cfg.shape, cfg.cached };
         const d = try Disk.make("damaged-check-size", shape, cached);
         defer d.deinit();
-        try d.vol.writeFile("short", "x" ** 1000); // two clusters
-        try d.vol.writeFile("long", "x" ** 1000);
-        try d.vol.writeFile("empty", "x" ** 1000);
+        try d.vol.writeFile("short", &@as([1000]u8, @splat('x'))); // two clusters
+        try d.vol.writeFile("long", &@as([1000]u8, @splat('x')));
+        try d.vol.writeFile("empty", &@as([1000]u8, @splat('x')));
         const short = try d.vol.open("short");
         const long = try d.vol.open("long");
         const empty = try d.vol.open("empty");
@@ -714,7 +714,7 @@ test "the check a slice at a time finds what the whole check finds, and starts a
         var data: [1500]u8 = undefined;
         try d.vol.writeFile("a", pattern(&data, 3));
         try d.vol.writeFile("b", pattern(&data, 4));
-        try d.vol.writeFile("short", "x" ** 1000);
+        try d.vol.writeFile("short", &@as([1000]u8, @splat('x')));
         var chain: [8]disk_fat.Cluster = undefined;
         const a = chainOf(d, (try d.vol.open("a")).first_cluster, &chain)[0..3].*;
         const b = chainOf(d, (try d.vol.open("b")).first_cluster, &chain)[0..3].*;
@@ -767,14 +767,14 @@ fn sliceTree(d: *test_disk.Disk) !void {
         try d.vol.writeFileIn(a, n, "x");
         if (i == 9) {
             const b = try d.vol.makeDirIn(a, "b folder with a long name");
-            try d.vol.writeFileIn(b, "short", "x" ** 1000);
-            try d.vol.writeFileIn(b, "long", "y" ** 1000);
+            try d.vol.writeFileIn(b, "short", &@as([1000]u8, @splat('x')));
+            try d.vol.writeFileIn(b, "long", &@as([1000]u8, @splat('y')));
             const c = try d.vol.makeDirIn(b, "c");
             try d.vol.writeFileIn(c, "f", "z");
         }
     }
     try d.vol.writeFile("top", "t");
-    const fifteen = try d.vol.makePath("d/" ** 14 ++ "d");
+    const fifteen = try d.vol.makePath(repeated("d/", 14) ++ "d");
     const sixteen = try d.vol.makeDirIn(fifteen, "d");
     try d.vol.writeFileIn(sixteen, "f", "x");
     setEntry(d, try d.vol.open("a/b folder with a long name/short"), .size, 5000); // short
@@ -930,12 +930,12 @@ test "the check says where it stopped going deeper, and does not call what is be
         // level is made by hand, as another program with no such limit would.
         const d = try Disk.make("limit-check-deep", shape, cached);
         defer d.deinit();
-        const fifteen = try d.vol.makePath("d/" ** 14 ++ "d");
+        const fifteen = try d.vol.makePath(repeated("d/", 14) ++ "d");
         const sixteen = try d.vol.makeDirIn(fifteen, "d");
         try d.vol.writeFileIn(sixteen, "f", "x");
         const r = try d.check();
         try r.expect(&.{
-            .{ .problem = .too_deep, .path = "/d" ** 16, .cluster = (try d.vol.open("d/" ** 15 ++ "d")).first_cluster },
+            .{ .problem = .too_deep, .path = repeated("/d", 16), .cluster = (try d.vol.open(repeated("d/", 15) ++ "d")).first_cluster },
         });
         try testing.expectEqual(@as(u32, 0), r.health.leaked);
     }
@@ -1014,4 +1014,15 @@ test {
     _ = @import("disk_fat_test_dirs.zig");
     _ = @import("disk_fat_test_fat32.zig");
     _ = @import("disk_fat_test_paths.zig");
+}
+
+/// `s` repeated `n` times, built at comptime (Zig 0.17 removed `s ** n`).
+fn repeated(comptime s: []const u8, comptime n: usize) *const [s.len * n]u8 {
+    const out = comptime blk: {
+        var a: [s.len * n]u8 = undefined;
+        @setEvalBranchQuota(1000 + n);
+        for (0..n) |i| @memcpy(a[i * s.len ..][0..s.len], s);
+        break :blk a;
+    };
+    return &out;
 }

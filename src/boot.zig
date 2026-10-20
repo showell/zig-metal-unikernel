@@ -64,8 +64,8 @@ export var page_directories align(4096) linksection(".data") = blk: {
 /// In `.data`, not `.bss`: the loader does not write `.bss`, so nothing there
 /// may be assumed zero, and a page table full of whatever was in RAM is a
 /// triple fault.
-export var pml4 align(4096) linksection(".data") = [_]u64{0} ** 512;
-export var pdpt align(4096) linksection(".data") = [_]u64{0} ** 512;
+export var pml4: [512]u64 align(4096) linksection(".data") = @splat(0);
+export var pdpt: [512]u64 align(4096) linksection(".data") = @splat(0);
 
 /// A flat GDT: a 64-bit code segment and a data segment, which is all long
 /// mode looks at — and two slots for the task state segment's descriptor

@@ -403,16 +403,16 @@ test "a line longer than the ring keeps its tail, and is read whole as far as it
     var r_buf: [16]u8 = undefined;
     var r = Ring.init(&r_buf);
     var out: [64]u8 = undefined;
-    r.write("x" ** 40);
+    r.write(&@as([40]u8, @splat('x')));
     // No line start is held at all: what is held is what there is.
-    try testing.expectEqualStrings("x" ** 16, r.read(&out));
+    try testing.expectEqualStrings(&@as([16]u8, @splat('x')), r.read(&out));
     r.write("\n");
     // A break as the last byte: nothing whole follows it.
-    try testing.expectEqualStrings("x" ** 15 ++ "\n", r.read(&out));
+    try testing.expectEqualStrings(&@as([15]u8, @splat('x')) ++ "\n", r.read(&out));
     r.write("y\n");
     try testing.expectEqualStrings("y\n", r.read(&out));
     // One write longer than the ring.
-    r.write("0123456789" ** 5 ++ "\n");
+    r.write(repeated("0123456789", 5) ++ "\n");
     // Its last 16 bytes are held, and the break that ends them is the only
     // one: read whole, as above.
     try testing.expectEqualStrings("56789" ++ "0123456789" ++ "\n", r.read(&out));
@@ -437,11 +437,11 @@ test "once bytes are lost, a break as the last byte leaves the whole ring; a bre
     var out: [64]u8 = undefined;
     var a_buf: [16]u8 = undefined;
     var a = Ring.init(&a_buf);
-    a.write("x" ** 30 ++ "\n");
-    try testing.expectEqualStrings("x" ** 15 ++ "\n", a.read(&out));
+    a.write(&@as([30]u8, @splat('x')) ++ "\n");
+    try testing.expectEqualStrings(&@as([15]u8, @splat('x')) ++ "\n", a.read(&out));
     var b_buf: [16]u8 = undefined;
     var b = Ring.init(&b_buf);
-    b.write("x" ** 30 ++ "\ny");
+    b.write(&@as([30]u8, @splat('x')) ++ "\ny");
     try testing.expectEqualStrings("y", b.read(&out));
 }
 
@@ -451,13 +451,13 @@ test "the first whole line starts at the seam when the break is the first piece'
     // 20 bytes into 16: positions 4..15 are the first piece, 16..19 the second.
     var a_buf: [16]u8 = undefined;
     var a = Ring.init(&a_buf);
-    a.write("a" ** 15 ++ "\nbcde");
+    a.write(&@as([15]u8, @splat('a')) ++ "\nbcde");
     try testing.expectEqual(@as(usize, 12), a.parts()[0].len);
-    try testing.expectEqualStrings("a" ** 11 ++ "\nbcde", joined(&a, &all));
+    try testing.expectEqualStrings(&@as([11]u8, @splat('a')) ++ "\nbcde", joined(&a, &all));
     try testing.expectEqualStrings("bcde", a.read(&out));
     var b_buf: [16]u8 = undefined;
     var b = Ring.init(&b_buf);
-    b.write("a" ** 16 ++ "\ncde");
+    b.write(&@as([16]u8, @splat('a')) ++ "\ncde");
     try testing.expectEqual(@as(usize, 12), b.parts()[0].len);
     try testing.expectEqualStrings("cde", b.read(&out));
 }
@@ -485,7 +485,7 @@ test "after many wraps, what is read is the end of what was written, from a line
     var out: [64]u8 = undefined;
     for (0..700) |k| {
         var line: [32]u8 = undefined;
-        const l = try std.fmt.bufPrint(&line, "line {d}{s}\n", .{ k, "!" ** 3 });
+        const l = try std.fmt.bufPrint(&line, "line {d}{s}\n", .{ k, &@as([3]u8, @splat('!')) });
         r.write(l);
         @memcpy(written[n..][0..l.len], l);
         n += l.len;
@@ -639,4 +639,15 @@ test "a moved ring still counts what it lost before the move (189's minor 12)" {
     moved.write("\nmore\n");
     try testing.expectEqualStrings("bbbbbbbbbb\ncc\nmore\n", moved.read(&out));
     try testing.expectEqual(@as(u64, 11), moved.lost());
+}
+
+/// `s` repeated `n` times, built at comptime (Zig 0.17 removed `s ** n`).
+fn repeated(comptime s: []const u8, comptime n: usize) *const [s.len * n]u8 {
+    const out = comptime blk: {
+        var a: [s.len * n]u8 = undefined;
+        @setEvalBranchQuota(1000 + n);
+        for (0..n) |i| @memcpy(a[i * s.len ..][0..s.len], s);
+        break :blk a;
+    };
+    return &out;
 }

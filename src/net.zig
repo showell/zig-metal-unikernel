@@ -101,7 +101,7 @@ pub const Net = struct {
     free_len: u16 = 0,
     /// Which transmit buffers are the device's, so a completion naming one
     /// it was not given is passed over rather than handed out twice.
-    lent: [tx_buffers]bool = [_]bool{false} ** tx_buffers,
+    lent: [tx_buffers]bool = @splat(false),
     /// Our own hardware address, from the device.
     mac: [6]u8,
     /// Frames sent since the device came up.
@@ -360,7 +360,7 @@ test "a used-ring entry: a frame, a buffer we never offered, a length no frame h
     try testing.expectEqual(RxEntry.strange_id, rxEntry(0xFFFF_FFFF, 100));
     try testing.expectEqual(RxEntry.bad_length, rxEntry(0, @sizeOf(Header)));
     try testing.expectEqual(RxEntry.bad_length, rxEntry(0, buffer_size + 1));
-    var lent = [_]bool{false} ** tx_buffers;
+    var lent: [tx_buffers]bool = @splat(false);
     lent[2] = true;
     try testing.expect(txEntryOurs(2, &lent));
     try testing.expect(!txEntryOurs(3, &lent));

@@ -381,7 +381,7 @@ test "a GUID is stored the way GPT stores it" {
 test "the kernel header says where every segment went" {
     var loader: [sector + 3]u8 = @splat(0x90);
     var kernel = Kernel{ .entry = 0x100020 };
-    kernel.segments[0] = .{ .paddr = 0x100000, .bytes = "abc" ** 200, .memsz = 4096 };
+    kernel.segments[0] = .{ .paddr = 0x100000, .bytes = repeated("abc", 200), .memsz = 4096 };
     kernel.segments[1] = .{ .paddr = 0x200000, .bytes = "z", .memsz = 1 };
     kernel.count = 2;
     const disk = try testing.allocator.alloc(u8, diskSectors(&kernel, 0) * sector);
@@ -448,4 +448,15 @@ test "a volume that is not whole sectors is refused" {
     const disk = try testing.allocator.alloc(u8, diskSectors(&kernel, 1024) * sector);
     defer testing.allocator.free(disk);
     try testing.expectError(error.VolumeNotWholeSectors, build(disk, &loader, &kernel, "odd"));
+}
+
+/// `s` repeated `n` times, built at comptime (Zig 0.17 removed `s ** n`).
+fn repeated(comptime s: []const u8, comptime n: usize) *const [s.len * n]u8 {
+    const out = comptime blk: {
+        var a: [s.len * n]u8 = undefined;
+        @setEvalBranchQuota(1000 + n);
+        for (0..n) |i| @memcpy(a[i * s.len ..][0..s.len], s);
+        break :blk a;
+    };
+    return &out;
 }

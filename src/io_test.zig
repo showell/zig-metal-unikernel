@@ -472,7 +472,7 @@ fn manyEntries(shape: test_disk.Shape) !void {
     defer arena.deinit();
     const got = try listLikeStore(arena.allocator(), "data/lynrummy/p1/puzzle/sessions");
     try testing.expectEqual(@as(usize, 600), got.len);
-    var seen = [_]bool{false} ** 601;
+    var seen: [601]bool = @splat(false);
     for (got) |e| {
         try testing.expectEqual(io_mod.Kind.directory, e.kind);
         const n = try std.fmt.parseInt(usize, e.name, 10);
@@ -826,7 +826,7 @@ test "a read tried again (boot's read_tries) answers past one refusal, and is co
 test "readFileAlloc whose read fails gives back what it took: the caller is told ReadFailed and holds nothing to free (metal-vmm QUEUE 172)" {
     const t = try Two.make(true);
     defer t.deinit();
-    const big = "a file of more than one sector, " ** 40;
+    const big = repeated("a file of more than one sector, ", 40);
     try cwd.writeFile(io, .{ .sub_path = "data/chat/big.md", .data = big });
     var n: u64 = 0;
     while (n < 12) : (n += 1) {
@@ -877,4 +877,15 @@ test "a volume whose FAT copies are unweighed refuses every write as a read-only
     // Weighed: writable again.
     v.writes = .taken;
     try cwd.writeFile(io, .{ .sub_path = "data/chat/plan.md", .data = "again" });
+}
+
+/// `s` repeated `n` times, built at comptime (Zig 0.17 removed `s ** n`).
+fn repeated(comptime s: []const u8, comptime n: usize) *const [s.len * n]u8 {
+    const out = comptime blk: {
+        var a: [s.len * n]u8 = undefined;
+        @setEvalBranchQuota(1000 + n);
+        for (0..n) |i| @memcpy(a[i * s.len ..][0..s.len], s);
+        break :blk a;
+    };
+    return &out;
 }
