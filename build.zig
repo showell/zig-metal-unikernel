@@ -1038,7 +1038,7 @@ fn commitOf(b: *std.Build, dir: []const u8) []const u8 {
 /// or not, stops the build and says the hash the checkout now has. Moving the
 /// SDK is moving this line, in the same commit as whatever needed the move.
 /// `-Dcoverage-sdk-unpinned` builds against anything, and says so.
-const coverage_sdk_pin = "cbb23e50de8df49415e4dbf36f8b3b5e805707d72adc227b515d84aaeeccd0da";
+const coverage_sdk_pin = "b7fde03fbe8e84f4e45041e099dbb3578be0d173a98c3dcc4a6b3bad492296ce";
 
 /// The SDK's content hash, as the pin is made (above), in hex.
 fn sdkContent(b: *std.Build, sdk_path: []const u8) ![64]u8 {
