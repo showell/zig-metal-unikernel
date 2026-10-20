@@ -472,15 +472,13 @@ pub fn build(b: *std.Build) void {
     test_cpu_dir = b.option([]const u8, "test-cpu-dir", "record each test binary's CPU time in this directory (tier0.sh's budget)");
     // **WHICH LINES OF THE TCP TABLE ITS UNIT TESTS RUN** (`zig build
     // tcp-coverage`): tcp_test.zig at every start below, each run once under
-    // tools/linecov.py; the lines with code that none of them ran are listed,
-    // for each of the table's four files (metal-vmm QUEUE 225, chunk 3a).
+    // the coverage SDK's `linecov`; the lines with code that none of them ran
+    // are listed, for each of the table's four files (metal-vmm QUEUE 225,
+    // chunk 3a). One run of each binary over all its files (`<files> --
+    // <binaries>`), as Shale's script-coverage runs it (metal-vmm QUEUE 243).
     const tcp_files = [_][]const u8{ "src/tcp.zig", "src/tcp_segment.zig", "src/tcp_arrives.zig", "src/tcp_timeouts.zig" };
-    var tcp_coverage: [tcp_files.len]*std.Build.Step.Run = undefined;
-    const tcp_coverage_step = b.step("tcp-coverage", "the lines of the TCP table (tcp.zig and the files split from it) its unit tests never run");
-    for (tcp_files, &tcp_coverage) |path, *run| {
-        run.* = b.addSystemCommand(&.{ "python3", "tools/linecov.py", path });
-        tcp_coverage_step.dependOn(&run.*.step);
-    }
+    const tcp_coverage = lineCoverage(b, sdk, &tcp_files);
+    b.step("tcp-coverage", "the lines of the TCP table (tcp.zig and the files split from it) its unit tests never run").dependOn(&tcp_coverage.step);
     // The same for the FAT: disk_fat.zig and disk_fat_dirent.zig, over the
     // merged unit binary (which also runs the simulators and store tests that
     // reach the FAT, so a line only a simulator runs counts as run) and
@@ -488,12 +486,8 @@ pub fn build(b: *std.Build) void {
     // disk_fat.zig is split by the 1,000-line rule (metal-vmm QUEUE 173):
     // each of its files is listed, over the same binaries.
     const fat_files = [_][]const u8{ "src/disk_fat.zig", "src/disk_fat_fat.zig", "src/disk_fat_chain.zig", "src/disk_fat_dir.zig", "src/disk_fat_file.zig", "src/disk_fat_remove.zig", "src/disk_fat_check.zig", "src/disk_fat_dirent.zig" };
-    var fat_coverage: [fat_files.len]*std.Build.Step.Run = undefined;
-    const fat_coverage_step = b.step("fat-coverage", "the lines of disk_fat.zig, its split files and disk_fat_dirent.zig no host test runs (the unit binary, simulators included, and the FAT test binaries)");
-    for (fat_files, &fat_coverage) |path, *run| {
-        run.* = b.addSystemCommand(&.{ "python3", "tools/linecov.py", path });
-        fat_coverage_step.dependOn(&run.*.step);
-    }
+    const fat_coverage = lineCoverage(b, sdk, &fat_files);
+    b.step("fat-coverage", "the lines of disk_fat.zig, its split files and disk_fat_dirent.zig no host test runs (the unit binary, simulators included, and the FAT test binaries)").dependOn(&fat_coverage.step);
     // **ONE BINARY FOR THE FILES' OWN TESTS** (src/unit_tests.zig, metal-vmm
     // QUEUE 142): one compile of the runner, std and the shared imports,
     // and each file's tests run once, not in every binary that imports it.
@@ -547,7 +541,7 @@ pub fn build(b: *std.Build) void {
         test_step.dependOn(&runTest(unit, path).step);
         // disk_fat's lines run in the merged binary, or in its own.
         if (std.mem.eql(u8, path, "src/unit_tests.zig") or std.mem.eql(u8, path, "src/disk_fat.zig") or std.mem.eql(u8, path, "src/disk_fat_dirent.zig")) {
-            for (fat_coverage) |run| run.addArtifactArg(unit);
+            fat_coverage.addArtifactArg(unit);
         }
     }
     // **WHICH LINES OF THE STORE'S ORACLE ITS OWN TESTS RUN** (`zig build
@@ -559,7 +553,7 @@ pub fn build(b: *std.Build) void {
         .target = b.graph.host,
         .imports = &unit_imports,
     }) });
-    const model_coverage = b.addSystemCommand(&.{ "python3", "tools/linecov.py", "src/store_model.zig" });
+    const model_coverage = lineCoverage(b, sdk, &.{"src/store_model.zig"});
     model_coverage.addArtifactArg(model_unit);
     b.step("store-model-coverage", "the lines of store_model.zig its own tests never run").dependOn(&model_coverage.step);
     // The test files built on their own, below.
@@ -807,7 +801,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
     if (wanted(test_file, "src/disk_fat_test.zig")) test_step.dependOn(&runTest(disk_fat_unit, disk_fat_unit.name).step);
-    for (fat_coverage) |run| run.addArtifactArg(disk_fat_unit);
+    fat_coverage.addArtifactArg(disk_fat_unit);
     // The stops and the lying disk (QUEUE.md items 79-80): hundreds of runs
     // each, so binaries of their own, run beside disk_fat_test's: one for the
     // stops and the failed requests, one for the lies. Every test in the file
@@ -838,7 +832,7 @@ pub fn build(b: *std.Build) void {
             }),
         });
         if (wanted(test_file, "src/disk_fat_faults_test.zig")) test_step.dependOn(&runTest(unit, name).step);
-        for (fat_coverage) |run| run.addArtifactArg(unit);
+        fat_coverage.addArtifactArg(unit);
     }
 
     const starts = [_]struct { isn: u32, peer: u32 }{
@@ -867,7 +861,7 @@ pub fn build(b: *std.Build) void {
             }),
         });
         if (wanted(test_file, "src/tcp_test.zig")) test_step.dependOn(&runTest(unit, unit.name).step);
-        for (tcp_coverage) |run| run.addArtifactArg(unit);
+        tcp_coverage.addArtifactArg(unit);
     }
 }
 
@@ -1038,6 +1032,19 @@ fn commitOf(b: *std.Build, dir: []const u8) []const u8 {
 /// or not, stops the build and says the hash the checkout now has. Moving the
 /// SDK is moving this line, in the same commit as whatever needed the move.
 /// `-Dcoverage-sdk-unpinned` builds against anything, and says so.
+/// The coverage SDK's `linecov` over `files`, its binaries added after: `linecov
+/// <files> -- <binaries>`, each binary run once for all of them.
+fn lineCoverage(b: *std.Build, sdk: *std.Build.Dependency, files: []const []const u8) *std.Build.Step.Run {
+    const run = b.addRunArtifact(sdk.artifact("linecov"));
+    for (files) |f| {
+        run.addArg(f);
+        run.addFileInput(b.path(f));
+    }
+    run.addArg("--");
+    run.has_side_effects = true;
+    return run;
+}
+
 const coverage_sdk_pin = "b7fde03fbe8e84f4e45041e099dbb3578be0d173a98c3dcc4a6b3bad492296ce";
 
 /// The SDK's content hash, as the pin is made (above), in hex.
