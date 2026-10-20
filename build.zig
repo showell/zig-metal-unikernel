@@ -27,6 +27,45 @@ fn kernelModule(b: *std.Build, root: std.Build.LazyPath, optimize: std.builtin.O
     });
 }
 
+/// **THE PATCHED compiler_rt IS FOR ZIG 0.17.0 ONLY** (compiler_rt_0_17_0/README.md).
+/// 0.17.0's own compiler_rt does not compile for this soft-float target
+/// (ziglang/zig#37006), so every kernel links the patched copy instead.
+/// Under any other Zig the build stops: the copy must go, and the stock
+/// compiler_rt be judged again, before this builds.
+const patched_runtime_zig: std.SemanticVersion = .{ .major = 0, .minor = 17, .patch = 0 };
+
+fn requirePatchedRuntimeZig() void {
+    const running = @import("builtin").zig_version;
+    if (running.order(patched_runtime_zig) == .eq) return;
+    std.process.fatal("zig-metal-unikernel links compiler_rt_0_17_0/, a patched compiler_rt for Zig 0.17.0 only, and this is Zig {f}: delete compiler_rt_0_17_0/ and linkPatchedRuntime (build.zig), build the kernels with Zig's stock compiler_rt, and judge them (the metal gate); see compiler_rt_0_17_0/README.md", .{running});
+}
+
+/// `exe` linked with compiler_rt_0_17_0/ in place of Zig's own compiler_rt;
+/// `kb` is this repo's builder (an application's kernel is made from its
+/// build, with this repo a dependency).
+fn linkPatchedRuntime(b: *std.Build, kb: *std.Build, exe: *std.Build.Step.Compile) void {
+    requirePatchedRuntimeZig();
+    exe.bundle_compiler_rt = false;
+    // As Zig builds its own: optimized whatever the kernel's mode, no stack
+    // probes or builtins (its memcpy must not call memcpy), and the
+    // kernel's code model.
+    const rt = b.addObject(.{ .name = "compiler_rt", .root_module = b.createModule(.{
+        .root_source_file = kb.path("compiler_rt_0_17_0/lib/compiler_rt.zig"),
+        .target = bareTarget(b),
+        .optimize = .fast,
+        .strip = true,
+        .stack_check = false,
+        .no_builtin = true,
+        .pic = false,
+        .code_model = .kernel,
+        .red_zone = false,
+        .single_threaded = true,
+    }) });
+    rt.bundle_compiler_rt = false;
+    rt.use_llvm = true;
+    exe.root_module.addObject(rt);
+}
+
 /// The one target: a 64-bit machine with no operating system, and no SSE in
 /// the kernel's own code (soft float, no SIMD), because the kernel saves no
 /// SSE state on an interrupt or a switch: compiled for SSE, it would reach
@@ -51,6 +90,7 @@ fn bareTarget(b: *std.Build) std.Build.ResolvedTarget {
 const Plant = enum { none, disk_write_swallowed, net_goback_byte, counted_leak_short, client_ack_off_by_one };
 
 pub fn build(b: *std.Build) void {
+    requirePatchedRuntimeZig();
     // **NOT Debug.** A Debug build pulls in zig's UBSan runtime, which wants
     // 128-bit float conversions and therefore the SSE registers this target has
     // switched off. ReleaseSafe keeps the bounds checks and leaves that out.
@@ -151,6 +191,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "probe_options", .module = probe_opts.createModule() },
         }) });
         exe.use_llvm = true;
+        linkPatchedRuntime(b, b, exe);
         exe.setLinkerScript(b.path("probe/link.ld"));
         exe.entry = .{ .symbol_name = "_start" };
 
@@ -311,6 +352,7 @@ pub fn build(b: *std.Build) void {
             .{ .name = "metal", .module = metal },
             .{ .name = "probe_options", .module = probe_opts.createModule() },
         }) });
+        linkPatchedRuntime(b, b, exe);
         check_step.dependOn(&exe.step);
     }
     var port_code: u8 = 0;
@@ -324,6 +366,7 @@ pub fn build(b: *std.Build) void {
     };
     if (std.mem.eql(u8, port_state, "fresh")) {
         const exe = b.addExecutable(.{ .name = "gopher.elf", .root_module = kernelModule(b, b.path("probe/gopher.zig"), .Debug, &gopher_imports) });
+        linkPatchedRuntime(b, b, exe);
         check_apps.dependOn(&exe.step);
     } else {
         // **A KERNEL NOT CHECKED FAILS THE CHECK** (Steve, 2026-10-10: fail,
@@ -932,6 +975,7 @@ fn appKernel(b: *std.Build, kb: *std.Build, a: App) *std.Build.Step.Compile {
     // Zig's own x86 backend, which Debug would otherwise pick, cannot yet
     // assemble this kernel's AT&T or its soft-float.
     exe.use_llvm = true;
+    linkPatchedRuntime(b, kb, exe);
     exe.setLinkerScript(kb.path("probe/link.ld"));
     exe.entry = .{ .symbol_name = "_start" };
     return exe;

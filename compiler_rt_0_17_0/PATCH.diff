@@ -1,0 +1,274 @@
+--- compiler_rt.zig	2026-10-01 22:02:32.000000000 +0000
++++ lib/compiler_rt.zig	2026-10-20 14:13:21.789104094 +0000
+@@ -392,6 +392,14 @@
+     };
+ }
+ 
++pub const have_c_longdouble = if (builtin.target.cTypeBitSize(.longdouble)) |bits| switch (bits) {
++    else => true,
++    80 => switch (std.zig.target.compilerRtFloatAbi(&builtin.target, bits)) {
++        .soft => false,
++        .hard => true,
++    },
++} else false;
++
+ pub fn Complex(comptime Float: type) type {
+     return struct { real: Float, imag: Float };
+ }
+diff -ru compiler_rt/cos.zig lib/compiler_rt/cos.zig
+--- compiler_rt/cos.zig	2026-10-01 22:02:32.000000000 +0000
++++ lib/compiler_rt/cos.zig	2026-10-20 14:13:21.789104094 +0000
+@@ -25,8 +25,10 @@
+     symbol(&cos, "cos");
+     symbol(&__cosx, "__cosx");
+     symbol(&cosq, "cosf128");
+-    symbol(&cosl, "cosl");
+-    symbol(&cosl, "__cosl"); // required by musl
++    if (compiler_rt.have_c_longdouble) {
++        symbol(&cosl, "cosl");
++        symbol(&cosl, "__cosl"); // required by musl
++    }
+ }
+ 
+ fn __cosh(x: compiler_rt.f16.Abi) callconv(.c) compiler_rt.f16.Abi {
+diff -ru compiler_rt/divc3.zig lib/compiler_rt/divc3.zig
+--- compiler_rt/divc3.zig	2026-10-01 22:02:32.000000000 +0000
++++ lib/compiler_rt/divc3.zig	2026-10-20 14:13:21.794104105 +0000
+@@ -13,7 +13,7 @@
+ const Complex = compiler_rt.Complex;
+ 
+ comptime {
+-    if (@import("builtin").zig_backend != .stage2_c) {
++    if (@import("builtin").zig_backend != .stage2_c and !@import("builtin").cpu.has(.x86, .soft_float)) {
+         symbol(&__divhc3, "__divhc3");
+         symbol(&__divsc3, "__divsc3");
+         symbol(&__divdc3, "__divdc3");
+diff -ru compiler_rt/exp.zig lib/compiler_rt/exp.zig
+--- compiler_rt/exp.zig	2026-10-01 22:02:32.000000000 +0000
++++ lib/compiler_rt/exp.zig	2026-10-20 14:13:21.789104094 +0000
+@@ -22,7 +22,7 @@
+     symbol(&exp, "exp");
+     symbol(&__expx, "__expx");
+     symbol(&expq, "expf128");
+-    symbol(&expl, "expl");
++    if (compiler_rt.have_c_longdouble) symbol(&expl, "expl");
+ }
+ 
+ fn __exph(x: compiler_rt.f16.Abi) callconv(.c) compiler_rt.f16.Abi {
+diff -ru compiler_rt/exp2.zig lib/compiler_rt/exp2.zig
+--- compiler_rt/exp2.zig	2026-10-01 22:02:32.000000000 +0000
++++ lib/compiler_rt/exp2.zig	2026-10-20 14:13:21.789104094 +0000
+@@ -20,7 +20,7 @@
+     symbol(&exp2, "exp2");
+     symbol(&__exp2x, "__exp2x");
+     symbol(&exp2q, "exp2f128");
+-    symbol(&exp2l, "exp2l");
++    if (compiler_rt.have_c_longdouble) symbol(&exp2l, "exp2l");
+ }
+ 
+ fn __exp2h(x: compiler_rt.f16.Abi) callconv(.c) compiler_rt.f16.Abi {
+diff -ru compiler_rt/fabs.zig lib/compiler_rt/fabs.zig
+--- compiler_rt/fabs.zig	2026-10-01 22:02:32.000000000 +0000
++++ lib/compiler_rt/fabs.zig	2026-10-20 14:13:21.789104094 +0000
+@@ -10,7 +10,7 @@
+     symbol(&fabs, "fabs");
+     symbol(&__fabsx, "__fabsx");
+     symbol(&fabsq, "fabsf128");
+-    symbol(&fabsl, "fabsl");
++    if (compiler_rt.have_c_longdouble) symbol(&fabsl, "fabsl");
+ }
+ 
+ fn __fabsh(a: compiler_rt.f16.Abi) callconv(.c) compiler_rt.f16.Abi {
+diff -ru compiler_rt/floor_ceil.zig lib/compiler_rt/floor_ceil.zig
+--- compiler_rt/floor_ceil.zig	2026-10-01 22:02:32.000000000 +0000
++++ lib/compiler_rt/floor_ceil.zig	2026-10-20 14:13:21.789104094 +0000
+@@ -24,7 +24,7 @@
+     symbol(&floor, "floor");
+     symbol(&__floorx, "__floorx");
+     symbol(&floorq, "floorf128");
+-    symbol(&floorl, "floorl");
++    if (compiler_rt.have_c_longdouble) symbol(&floorl, "floorl");
+ 
+     // ceil
+     symbol(&__ceilh, "__ceilh");
+@@ -32,7 +32,7 @@
+     symbol(&ceil, "ceil");
+     symbol(&__ceilx, "__ceilx");
+     symbol(&ceilq, "ceilf128");
+-    symbol(&ceill, "ceill");
++    if (compiler_rt.have_c_longdouble) symbol(&ceill, "ceill");
+ }
+ 
+ fn __floorh(x: compiler_rt.f16.Abi) callconv(.c) compiler_rt.f16.Abi {
+diff -ru compiler_rt/fma.zig lib/compiler_rt/fma.zig
+--- compiler_rt/fma.zig	2026-10-01 22:02:32.000000000 +0000
++++ lib/compiler_rt/fma.zig	2026-10-20 14:13:21.789104094 +0000
+@@ -17,7 +17,7 @@
+     symbol(&fma, "fma");
+     symbol(&__fmax, "__fmax");
+     symbol(&fmaq, "fmaf128");
+-    symbol(&fmal, "fmal");
++    if (compiler_rt.have_c_longdouble) symbol(&fmal, "fmal");
+ }
+ 
+ fn __fmah(x: compiler_rt.f16.Abi, y: compiler_rt.f16.Abi, z: compiler_rt.f16.Abi) callconv(.c) compiler_rt.f16.Abi {
+diff -ru compiler_rt/fmax.zig lib/compiler_rt/fmax.zig
+--- compiler_rt/fmax.zig	2026-10-01 22:02:32.000000000 +0000
++++ lib/compiler_rt/fmax.zig	2026-10-20 14:13:21.789104094 +0000
+@@ -11,7 +11,7 @@
+     symbol(&fmax, "fmax");
+     symbol(&__fmaxx, "__fmaxx");
+     symbol(&fmaxq, "fmaxf128");
+-    symbol(&fmaxl, "fmaxl");
++    if (compiler_rt.have_c_longdouble) symbol(&fmaxl, "fmaxl");
+ }
+ 
+ fn __fmaxh(x: compiler_rt.f16.Abi, y: compiler_rt.f16.Abi) callconv(.c) compiler_rt.f16.Abi {
+diff -ru compiler_rt/fmin.zig lib/compiler_rt/fmin.zig
+--- compiler_rt/fmin.zig	2026-10-01 22:02:32.000000000 +0000
++++ lib/compiler_rt/fmin.zig	2026-10-20 14:13:21.789104094 +0000
+@@ -11,7 +11,7 @@
+     symbol(&fmin, "fmin");
+     symbol(&__fminx, "__fminx");
+     symbol(&fminq, "fminf128");
+-    symbol(&fminl, "fminl");
++    if (compiler_rt.have_c_longdouble) symbol(&fminl, "fminl");
+ }
+ 
+ fn __fminh(x: compiler_rt.f16.Abi, y: compiler_rt.f16.Abi) callconv(.c) compiler_rt.f16.Abi {
+diff -ru compiler_rt/fmod.zig lib/compiler_rt/fmod.zig
+--- compiler_rt/fmod.zig	2026-10-01 22:02:32.000000000 +0000
++++ lib/compiler_rt/fmod.zig	2026-10-20 14:13:21.789104094 +0000
+@@ -13,7 +13,7 @@
+     symbol(&fmod, "fmod");
+     symbol(&__fmodx, "__fmodx");
+     symbol(&fmodq, "fmodf128");
+-    symbol(&fmodl, "fmodl");
++    if (compiler_rt.have_c_longdouble) symbol(&fmodl, "fmodl");
+ }
+ 
+ fn __fmodh(a: compiler_rt.f16.Abi, b: compiler_rt.f16.Abi) callconv(.c) compiler_rt.f16.Abi {
+diff -ru compiler_rt/log.zig lib/compiler_rt/log.zig
+--- compiler_rt/log.zig	2026-10-01 22:02:32.000000000 +0000
++++ lib/compiler_rt/log.zig	2026-10-20 14:13:21.790104096 +0000
+@@ -19,7 +19,7 @@
+     symbol(&log, "log");
+     symbol(&__logx, "__logx");
+     symbol(&logq, "logf128");
+-    symbol(&logl, "logl");
++    if (compiler_rt.have_c_longdouble) symbol(&logl, "logl");
+ }
+ 
+ fn __logh(a: compiler_rt.f16.Abi) callconv(.c) compiler_rt.f16.Abi {
+diff -ru compiler_rt/log10.zig lib/compiler_rt/log10.zig
+--- compiler_rt/log10.zig	2026-10-01 22:02:32.000000000 +0000
++++ lib/compiler_rt/log10.zig	2026-10-20 14:13:21.790104096 +0000
+@@ -19,7 +19,7 @@
+     symbol(&log10, "log10");
+     symbol(&__log10x, "__log10x");
+     symbol(&log10q, "log10f128");
+-    symbol(&log10l, "log10l");
++    if (compiler_rt.have_c_longdouble) symbol(&log10l, "log10l");
+ }
+ 
+ fn __log10h(a: compiler_rt.f16.Abi) callconv(.c) compiler_rt.f16.Abi {
+diff -ru compiler_rt/log2.zig lib/compiler_rt/log2.zig
+--- compiler_rt/log2.zig	2026-10-01 22:02:32.000000000 +0000
++++ lib/compiler_rt/log2.zig	2026-10-20 14:13:21.790104096 +0000
+@@ -20,7 +20,7 @@
+     symbol(&log2, "log2");
+     symbol(&__log2x, "__log2x");
+     symbol(&log2q, "log2f128");
+-    symbol(&log2l, "log2l");
++    if (compiler_rt.have_c_longdouble) symbol(&log2l, "log2l");
+ }
+ 
+ fn __log2h(a: compiler_rt.f16.Abi) callconv(.c) compiler_rt.f16.Abi {
+diff -ru compiler_rt/mulc3.zig lib/compiler_rt/mulc3.zig
+--- compiler_rt/mulc3.zig	2026-10-01 22:02:32.000000000 +0000
++++ lib/compiler_rt/mulc3.zig	2026-10-20 14:13:21.794104105 +0000
+@@ -8,7 +8,7 @@
+ const Complex = compiler_rt.Complex;
+ 
+ comptime {
+-    if (@import("builtin").zig_backend != .stage2_c) {
++    if (@import("builtin").zig_backend != .stage2_c and !@import("builtin").cpu.has(.x86, .soft_float)) {
+         symbol(&__mulhc3, "__mulhc3");
+         symbol(&__mulsc3, "__mulsc3");
+         symbol(&__muldc3, "__muldc3");
+diff -ru compiler_rt/round.zig lib/compiler_rt/round.zig
+--- compiler_rt/round.zig	2026-10-01 22:02:32.000000000 +0000
++++ lib/compiler_rt/round.zig	2026-10-20 14:13:21.790104096 +0000
+@@ -19,7 +19,7 @@
+     symbol(&round, "round");
+     symbol(&__roundx, "__roundx");
+     symbol(&roundq, "roundf128");
+-    symbol(&roundl, "roundl");
++    if (compiler_rt.have_c_longdouble) symbol(&roundl, "roundl");
+ }
+ 
+ fn __roundh(x: compiler_rt.f16.Abi) callconv(.c) compiler_rt.f16.Abi {
+diff -ru compiler_rt/sin.zig lib/compiler_rt/sin.zig
+--- compiler_rt/sin.zig	2026-10-01 22:02:32.000000000 +0000
++++ lib/compiler_rt/sin.zig	2026-10-20 14:13:21.790104096 +0000
+@@ -25,8 +25,10 @@
+     symbol(&sin, "sin");
+     symbol(&__sinx, "__sinx");
+     symbol(&sinq, "sinf128");
+-    symbol(&sinl, "sinl");
+-    symbol(&sinl, "__sinl"); // required by musl
++    if (compiler_rt.have_c_longdouble) {
++        symbol(&sinl, "sinl");
++        symbol(&sinl, "__sinl"); // required by musl
++    }
+ }
+ 
+ fn __sinh(x: compiler_rt.f16.Abi) callconv(.c) compiler_rt.f16.Abi {
+diff -ru compiler_rt/sincos.zig lib/compiler_rt/sincos.zig
+--- compiler_rt/sincos.zig	2026-10-01 22:02:32.000000000 +0000
++++ lib/compiler_rt/sincos.zig	2026-10-20 14:13:21.790104096 +0000
+@@ -19,7 +19,7 @@
+     symbol(&sincos, "sincos");
+     symbol(&sincosx, "__sincosx");
+     symbol(&sincosq, "sincosf128");
+-    symbol(&sincosl, "sincosl");
++    if (compiler_rt.have_c_longdouble) symbol(&sincosl, "sincosl");
+ }
+ 
+ fn sincosh(x: compiler_rt.f16.Abi, r_sin: *compiler_rt.f16.Abi, r_cos: *compiler_rt.f16.Abi) callconv(.c) void {
+diff -ru compiler_rt/sqrt.zig lib/compiler_rt/sqrt.zig
+--- compiler_rt/sqrt.zig	2026-10-01 22:02:32.000000000 +0000
++++ lib/compiler_rt/sqrt.zig	2026-10-20 14:13:21.790104096 +0000
+@@ -23,7 +23,7 @@
+     } else if (compiler_rt.want_sparc32_abi) {
+         symbol(&sqrtq, "_Q_sqrt");
+     }
+-    symbol(&sqrtl, "sqrtl");
++    if (compiler_rt.have_c_longdouble) symbol(&sqrtl, "sqrtl");
+ }
+ 
+ fn __sqrth(x: compiler_rt.f16.Abi) callconv(.c) compiler_rt.f16.Abi {
+diff -ru compiler_rt/tan.zig lib/compiler_rt/tan.zig
+--- compiler_rt/tan.zig	2026-10-01 22:02:32.000000000 +0000
++++ lib/compiler_rt/tan.zig	2026-10-20 14:13:21.790104096 +0000
+@@ -29,7 +29,7 @@
+     symbol(&tan, "tan");
+     symbol(&__tanx, "__tanx");
+     symbol(&tanq, "tanf128");
+-    symbol(&tanl, "tanl");
++    if (compiler_rt.have_c_longdouble) symbol(&tanl, "tanl");
+ }
+ 
+ fn __tanh(x: compiler_rt.f16.Abi) callconv(.c) compiler_rt.f16.Abi {
+diff -ru compiler_rt/trunc.zig lib/compiler_rt/trunc.zig
+--- compiler_rt/trunc.zig	2026-10-01 22:02:32.000000000 +0000
++++ lib/compiler_rt/trunc.zig	2026-10-20 14:13:21.790104096 +0000
+@@ -18,7 +18,7 @@
+     symbol(&trunc, "trunc");
+     symbol(&__truncx, "__truncx");
+     symbol(&truncq, "truncf128");
+-    symbol(&truncl, "truncl");
++    if (compiler_rt.have_c_longdouble) symbol(&truncl, "truncl");
+ }
+ 
+ fn __trunch(x: compiler_rt.f16.Abi) callconv(.c) compiler_rt.f16.Abi {
