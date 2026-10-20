@@ -2,7 +2,7 @@
 # **TIER 0: ZIG, PYTHON AND THE COVERAGE SDK, NOTHING ELSE** (metal-vmm QUEUE
 # 197). The check to run on every change: the unit tests and the simulators,
 # this repo's own kernels type-checked, the formatter and the lints. No QEMU, no other repo, no
-# network, no root. Needs zig 0.16, python3, and ../zig-coverage-sdk at the
+# network, no root. Needs zig 0.17, python3, and ../zig-coverage-sdk at the
 # commit build.zig.zon pins.
 #
 # **EVERY SIBLING IS POINTED AT NOTHING HERE**, so a step that reaches

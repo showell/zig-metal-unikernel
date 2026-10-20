@@ -15,7 +15,7 @@ old links, and dated documents here still use the old name.
 
 A **unikernel** is one program compiled together with just enough kernel to
 run it, booted directly on a machine (real or virtual), with no general
-operating system in between. This one is written in Zig 0.16 and targets
+operating system in between. This one is written in Zig 0.17 and targets
 `x86_64-freestanding`, Zig's name for "no operating system".
 
 What it does by itself, with no borrowed code below the application:
@@ -176,7 +176,9 @@ this repo does not build.
 
 ### What you need
 
-- **Zig 0.16.0**, exactly.
+- **Zig 0.17.0**, exactly: the kernels link a patched compiler_rt made
+  for 0.17.0 (`compiler_rt_0_17_0/`, whose README says why and when it
+  goes), and the build refuses any other Zig.
 - **Python 3**, for the judges and the release tools.
 - **QEMU** (`qemu-system-x86_64`) and **KVM**, for anything that boots a
   kernel. Without KVM, the droplet-shaped machine runs under software
@@ -284,7 +286,7 @@ cheapest first, and stops at the first one that fails.
 
 | tier | install | what it proves | about |
 |---|---|---|---|
-| `./tier0.sh` | zig 0.16, Python 3, and the SDK beside this checkout | the unit tests and short simulator runs; this repo's kernels and host programs type-check; `zig fmt` and the lints; tcp_sim's golden traces. No QEMU, no other repo, no network, no root. Run it on every change | ~2-3 min |
+| `./tier0.sh` | zig 0.17, Python 3, and the SDK beside this checkout | the unit tests and short simulator runs; this repo's kernels and host programs type-check; `zig fmt` and the lints; tcp_sim's golden traces. No QEMU, no other repo, no network, no root. Run it on every change | ~2-3 min |
 | `./tier1.sh` | + QEMU, dosfstools, gdisk, mtools, curl, binutils, `sudo -n` for loop mounts and the TAP device; KVM for the droplet boots (or `ACCEL=tcg`) | tcp.zig against Linux's own TCP, as server and as client (the native judge, quick, ~25 s, first); each test kernel ("probe") boots and works on virtual hardware; the judges' own tests; the droplet's boot loader and image; the sleeper sleeping on a real timer, woken by its timer and by a request (`droplet/sleeps.py`, KVM) | ~25 s native, ~45 s of probes, then the droplet boots, ~10 s of sleeps |
 | `./tier2.sh` | + metal-vmm beside this checkout, and /dev/kvm | metal-vmm runs this checkout's probe kernels the same as QEMU does, and the same twice | minutes |
 | `./tier3.sh` | + zig-webbox and angry-gopher beside this checkout | the library's tests and the limits it copies; the unit tests' pinned body rule is still the library's; gopher.elf type-checks, builds and is judged against its Linux build on QEMU's microvm and the droplet-shaped machine; the PC-shaped machine's rests and the timeouts on metal-vmm; a sleeping kernel in the machine's own time (metal-vmm `sleeps.sh`: an idle gopher.elf's cost, the sleeper's hour of wakes, the longest rest) | ~20 min |

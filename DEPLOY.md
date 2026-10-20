@@ -268,7 +268,7 @@ or Dog Park:
 
 - **Fork and check out side by side:** zig-metal-unikernel, zig-webbox,
   zig-coverage-sdk, and angry-gopher or dog-park; metal-vmm too, for tiers
-  2-3 and the long tier. Zig 0.16. The README's "What you need" lists the
+  2-3 and the long tier. Zig 0.17. The README's "What you need" lists the
   rest (QEMU, mtools, dosfstools, KVM for metal-vmm).
 - **Try it locally first:** angry-gopher's `ops/start` (Linux, :9001), or
   dog-park's `zig build play` (:9103). Then `./tier0.sh`.

@@ -2,7 +2,7 @@
     .name = .zig_metal_unikernel,
     .version = "0.0.0",
     .fingerprint = 0x359118429fe2aac7,
-    .minimum_zig_version = "0.16.0",
+    .minimum_zig_version = "0.17.0",
     .dependencies = .{
         // Coverage properties (COVERAGE.md): a sibling checkout, as
         // angry-gopher and metal-vmm are.
