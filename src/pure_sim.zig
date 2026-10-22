@@ -424,20 +424,13 @@ pub fn restartSeed(seed: u64) !void {
 
 // ── the request heap ────────────────────────────────────────────────────────
 
-/// **A FINDING, NOT YET A RULING** (metal-vmm QUEUE.md, Questions): the same
-/// request does not always ask the same amount. `used` counts a growth only
-/// when the arena can grow the block in place, and when it cannot the caller
-/// (ArrayList's `remap`, then `alloc`) is counted the whole new block. Which
-/// one happens depends on how much room the arena's node has, and that is
-/// what the request before left: the capacity `preheat` takes is not the
-/// capacity a reset keeps. So the figure the judge requires to be the same
-/// for the same request moves with what came before it. These seeds show it,
-/// preheated; `strict` is off in the sweep until the box rules.
-const heap_red = [_]u64{ 69, 153, 285 };
+/// Seeds where a growth could not be made in place, so the block moved: the
+/// same request must still ask the same amount, whatever the request before
+/// left in the arena.
+const heap_moves = [_]u64{ 69, 153, 285 };
 
-test "request_heap: the same request asks the same amount, preheated (red until the ruling)" {
-    if (true) return error.SkipZigTest;
-    for (heap_red) |seed| try heapSeed(seed, true);
+test "request_heap: the same request asks the same amount, preheated, where a growth moves its block" {
+    for (heap_moves) |seed| try heapSeed(seed, true);
 }
 
 pub fn heapSeed(seed: u64, strict: bool) !void {
@@ -481,15 +474,20 @@ pub fn heapSeed(seed: u64, strict: bool) !void {
                         try live.append(gpa, .{ .mem = mem, .fill = fill });
                     },
                     3 => if (live.items.len > 0) {
-                        // Grow or shrink one in place, if the arena can.
+                        // Grow or shrink one as a list does: in place if the
+                        // arena can, moved if not. Either way the request
+                        // asked for what it grew by.
                         const i = o.uintLessThan(usize, live.items.len);
                         const l = &live.items[i];
                         const new_len = o.uintLessThan(usize, l.mem.len * 2 + 16);
-                        if (a.resize(l.mem, new_len)) {
-                            if (new_len > l.mem.len) given += new_len - l.mem.len;
-                            const old = l.mem.len;
-                            l.mem.len = new_len;
-                            if (new_len > old) @memset(l.mem[old..], l.fill);
+                        const old = l.mem.len;
+                        l.mem = a.realloc(l.mem, new_len) catch {
+                            props.reachable(@src(), "request_heap: a growth meets the limit of what backs it", null);
+                            continue;
+                        };
+                        if (new_len > old) {
+                            given += new_len - old;
+                            @memset(l.mem[old..], l.fill);
                         }
                     },
                     4 => if (live.items.len > 0) {
