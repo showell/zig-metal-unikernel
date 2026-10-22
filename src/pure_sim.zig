@@ -430,10 +430,10 @@ pub fn restartSeed(seed: u64) !void {
 const heap_moves = [_]u64{ 69, 153, 285 };
 
 test "request_heap: the same request asks the same amount, preheated, where a growth moves its block" {
-    for (heap_moves) |seed| try heapSeed(seed, true);
+    for (heap_moves) |seed| try heapSeed(seed);
 }
 
-pub fn heapSeed(seed: u64, strict: bool) !void {
+pub fn heapSeed(seed: u64) !void {
     var prng = std.Random.DefaultPrng.init(seed);
     const r = prng.random();
     const gpa = testing.allocator;
@@ -509,10 +509,8 @@ pub fn heapSeed(seed: u64, strict: bool) !void {
             if (preheated and heap.capacity() > @max(warm, cap_before)) return fail(seed, "heap: a reset kept more than it had", step);
             if (preheated and cap_before > warm and heap.capacity() <= warm) props.reachable(@src(), "request_heap: a reset gives back what grew past what it keeps", null);
         }
-        if (!failing.has_induced_failure and used_by_request[0] != used_by_request[1]) {
-            if (preheated) props.reachable(@src(), "request_heap: the same request asks a different amount after a reset (a finding)", .{ .seed = seed });
-            if (strict) return fail(seed, "heap: the same request asked for a different amount", step);
-        }
+        if (!failing.has_induced_failure and used_by_request[0] != used_by_request[1])
+            return fail(seed, "heap: the same request asked for a different amount", step);
     }
 }
 
@@ -523,7 +521,7 @@ pub fn runSeed(seed: u64) !void {
     try ringSeed(seed);
     try keptSeed(seed);
     try restartSeed(seed);
-    try heapSeed(seed, false);
+    try heapSeed(seed);
 }
 
 test "the pure modules under a seed, a handful of seeds" {

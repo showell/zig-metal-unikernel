@@ -600,10 +600,13 @@ pub fn heapSeed(seed: u64) Failure!void {
     @memcpy(before[0..a.len], a);
     _ = a_alloc.alloc(u8, r.intRangeAtMost(usize, 1, 500)) catch return fail(seed, "no memory", .{});
     const used = heap.used;
-    if (a_alloc.remap(a, a.len + r.intRangeAtMost(usize, 1, 4096)) != null)
-        return fail(seed, "the first of two blocks grew in place", .{});
-    if (!std.mem.eql(u8, a, before[0..a.len])) return fail(seed, "a block that could not grow lost its bytes", .{});
-    if (heap.used != used) return fail(seed, "a growth that did not happen was counted", .{});
+    // The block after it keeps it from growing in place, so it moves: its
+    // bytes go with it, and the request is counted what it grew by.
+    const growth = r.intRangeAtMost(usize, 1, 4096);
+    const moved = a_alloc.remap(a, a.len + growth) orelse return fail(seed, "a block that could not grow in place did not move", .{});
+    if (moved.ptr == a.ptr) return fail(seed, "the first of two blocks grew in place", .{});
+    if (!std.mem.eql(u8, moved[0..a.len], before[0..a.len])) return fail(seed, "a block that moved lost its bytes", .{});
+    if (heap.used != used + growth) return fail(seed, "a move was not counted as its growth alone", .{});
     heap.reset();
 }
 

@@ -103,12 +103,23 @@ pub const RequestHeap = struct {
         return true;
     }
 
+    /// A block that cannot grow in place is moved here rather than by the
+    /// caller, so the request is counted what it grew by either way: left to
+    /// the caller, the move is a new `alloc` of the whole block, and whether
+    /// it happens depends on what the request before left in the arena.
     fn remap(ctx: *anyopaque, memory: []u8, alignment: std.mem.Alignment, new_len: usize, ret_addr: usize) ?[*]u8 {
         const self: *RequestHeap = @ptrCast(@alignCast(ctx));
         const inner = self.arena.allocator();
-        const p = inner.vtable.remap(inner.ptr, memory, alignment, new_len, ret_addr) orelse {
-            props.reachable(@src(), "request heap: a block cannot grow in place, and the caller must move it", .{ .len = new_len });
-            return null;
+        const p = inner.vtable.remap(inner.ptr, memory, alignment, new_len, ret_addr) orelse moved: {
+            props.reachable(@src(), "request heap: a block cannot grow in place, and moves", .{ .len = new_len });
+            const to = inner.vtable.alloc(inner.ptr, new_len, alignment, ret_addr) orelse {
+                props.reachable(@src(), "request heap: the pages run out under a block that moves", .{ .len = new_len });
+                return null;
+            };
+            const kept = @min(memory.len, new_len);
+            @memcpy(to[0..kept], memory[0..kept]);
+            inner.vtable.free(inner.ptr, memory, alignment, ret_addr);
+            break :moved to;
         };
         if (new_len > memory.len) self.used += new_len - memory.len;
         return p;
@@ -148,6 +159,20 @@ test "the same request twice asks for the same amount" {
     }
     try testing.expectEqual(seen[0], seen[1]);
     try testing.expectEqual(seen[1], seen[2]);
+}
+
+test "a block that cannot grow in place moves, and the request is counted what it grew by" {
+    var heap = RequestHeap.init(testing.allocator, 4096);
+    defer heap.deinit();
+    const a = heap.allocator();
+    const first = try a.alloc(u8, 100);
+    @memset(first, 7);
+    // A block after it, so it cannot grow where it is.
+    _ = try a.alloc(u8, 50);
+    const grown = try a.realloc(first, 1000);
+    try testing.expect(grown.ptr != first.ptr);
+    for (grown[0..100]) |b| try testing.expectEqual(@as(u8, 7), b);
+    try testing.expectEqual(@as(usize, 100 + 50 + 900), heap.used);
 }
 
 test "it grows past what it keeps, and gives the growth back" {

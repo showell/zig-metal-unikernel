@@ -94,6 +94,7 @@ restart: the count stops at 255
 restart: the back-off reaches 15 minutes
 restart: one damaged byte reads as no record
 request_heap: a request meets the limit of what backs it
+request_heap: a growth meets the limit of what backs it
 request_heap: a reset gives back what grew past what it keeps
 
 # disk_fat.zig's refusals and FAT32 paths, reached by fat_sim's probes (runProbeSeed).
@@ -241,7 +242,7 @@ proto: a packet too short for a UDP header
 proto: a packet's payload lies within its frame
 proto: a total length past the frame
 proto: a total length shorter than the header
-request heap: a block cannot grow in place, and the caller must move it
+request heap: a block cannot grow in place, and moves
 request heap: a request is answered and its memory goes back
 request heap: the machine has not the memory it keeps
 request heap: the pages run out under a request
