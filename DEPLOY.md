@@ -67,7 +67,10 @@ zig-coverage-sdk's, which the verdicts also key on.
    angry-gopher's site files that git does not track:
    `~/showell_repos/angry-gopher/ops/build_downloads` (the Safari downloads;
    every site disk, the gates' and the image's, copies `downloads/`, and
-   both refuse without it). Then **angry-gopher's own checks**,
+   both refuse without it), and `~/showell_repos/angry-gopher/ops/build_embedded`
+   (what the server embeds that git does not track, Shale's pages from the
+   shale checkout among them: a copy left from an older build would ship as
+   it is). Then **angry-gopher's own checks**,
    `~/showell_repos/angry-gopher/ops/check_zig`: its lints, its unit tests
    and zig-webbox's, which the gates below do not run (they judge metal
    against Linux). It must pass before step 2.
