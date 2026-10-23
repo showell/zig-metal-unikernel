@@ -992,10 +992,15 @@ const Served = struct {
 
 fn servedBy(b: *std.Build, path: []const u8) Served {
     // Read at configure time, which 0.17 caches: a row added must configure
-    // the build again, or the kernel compiles with the old list.
-    b.dependOnFileContents(.{ .cwd_relative = path });
+    // the build again, or the kernel compiles with the old list. A file
+    // that is not there (tier 0 builds the kernel alone) cannot be a
+    // dependency, so that configure is never cached instead.
     const io = b.graph.io;
-    const text = std.Io.Dir.cwd().readFileAlloc(io, path, b.allocator, .limited(1 << 20)) catch return .{};
+    const text = std.Io.Dir.cwd().readFileAlloc(io, path, b.allocator, .limited(1 << 20)) catch {
+        b.graph.poisonCache();
+        return .{};
+    };
+    b.dependOnFileContents(.{ .cwd_relative = path });
     const z = b.allocator.dupeSentinel(u8, text, 0) catch @panic("out of memory");
     var diag: std.zon.parse.Diagnostics = undefined;
     return std.zon.parse.fromSlice(Served, .{ .gpa = b.allocator, .arena = b.allocator, .source = z, .diagnostics = &diag }) catch
