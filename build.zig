@@ -991,6 +991,9 @@ const Served = struct {
 };
 
 fn servedBy(b: *std.Build, path: []const u8) Served {
+    // Read at configure time, which 0.17 caches: a row added must configure
+    // the build again, or the kernel compiles with the old list.
+    b.dependOnFileContents(.{ .cwd_relative = path });
     const io = b.graph.io;
     const text = std.Io.Dir.cwd().readFileAlloc(io, path, b.allocator, .limited(1 << 20)) catch return .{};
     const z = b.allocator.dupeSentinel(u8, text, 0) catch @panic("out of memory");
@@ -1064,7 +1067,10 @@ fn sdkContent(b: *std.Build, sdk_path: []const u8) ![64]u8 {
     var dir = try std.Io.Dir.cwd().openDir(io, sdk_path, .{});
     defer dir.close(io);
     var h = std.crypto.hash.sha2.Sha256.init(.{});
+    // The configure step 0.17 caches reads these, and the list git gives.
+    for ([_][]const u8{ "", "src", "tools" }) |sub| b.dependOnDirectoryContents(.{ .cwd_relative = b.pathJoin(&.{ sdk_path, sub }) });
     for (names.items) |n| {
+        b.dependOnFileContents(.{ .cwd_relative = b.pathJoin(&.{ sdk_path, n }) });
         const bytes = try dir.readFileAlloc(io, n, b.allocator, .limited(64 << 20));
         var each: [32]u8 = undefined;
         std.crypto.hash.sha2.Sha256.hash(bytes, &each, .{});
@@ -1110,10 +1116,14 @@ fn catalogFiles(b: *std.Build) []const []const u8 {
     var src = b.root.root_dir.handle.openDir(io, "src", .{ .iterate = true }) catch |e|
         std.process.fatal("src/ cannot be listed for the coverage catalog ({t})", .{e});
     defer src.close(io);
+    // A file added to src/, or one that starts declaring properties, must
+    // configure the build again (0.17 caches the configure step).
+    b.dependOnDirectoryContents(b.path("src"));
     var out: std.ArrayList([]const u8) = .empty;
     var it = src.iterate();
     while (it.next(io) catch |e| std.process.fatal("src/ cannot be listed ({t})", .{e})) |entry| {
         if (entry.kind != .file or !std.mem.endsWith(u8, entry.name, ".zig")) continue;
+        b.dependOnFileContents(b.path(b.pathJoin(&.{ "src", entry.name })));
         const text = src.readFileAlloc(io, entry.name, b.allocator, .limited(1 << 22)) catch |e|
             std.process.fatal("src/{s}: cannot be read for the coverage catalog ({t})", .{ entry.name, e });
         if (std.mem.indexOf(u8, text, "@import(\"coverage\")") == null) continue;
@@ -1135,6 +1145,7 @@ fn catalogFiles(b: *std.Build) []const []const u8 {
 /// Stops the build when a `test "..."` in `path` contains none of `filters`:
 /// a test binary built with filters runs only the tests they name.
 fn everyTestFiltered(b: *std.Build, path: []const u8, filters: []const []const u8) void {
+    b.dependOnFileContents(b.path(path));
     const text = b.root.root_dir.handle.readFileAlloc(b.graph.io, path, b.allocator, .limited(1 << 22)) catch |e|
         std.process.fatal("{s}: cannot be read to check its test names ({t})", .{ path, e });
     var it = std.mem.splitScalar(u8, text, '\n');
