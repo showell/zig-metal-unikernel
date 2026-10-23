@@ -1021,6 +1021,11 @@ fn stampOf(b: *std.Build, stamp: Stamp, dir: []const u8) []const u8 {
 /// `git rev-parse --short HEAD` in `dir`, with `+dirty` when its tree has
 /// uncommitted changes; `unknown` when git cannot say.
 fn commitOf(b: *std.Build, dir: []const u8) []const u8 {
+    // Asked at configure time, which 0.17 caches: a commit, or a tree that
+    // turned clean, must configure the build again, or it bakes in the old
+    // answer (v36 said `cb198ca+dirty`, built at b70f9d6 clean). Whether a
+    // tree is dirty rests on every file in it, which no dependency names.
+    b.graph.poisonCache();
     var code: u8 = 0;
     const head = b.runAllowFail(&.{ "git", "-C", dir, "rev-parse", "--short", "HEAD" }, &code, .ignore) catch return "unknown";
     const short = std.mem.trim(u8, head, " \n");
