@@ -55,6 +55,11 @@ WEBBOX_BUILT = ("src", "build.zig", "build.zig.zon")
 SHALE_CHECKOUT = os.path.realpath(os.environ.get("SHALE_CHECKOUT", os.path.join(ROOT, "..", "shale")))
 SHALE_SRC = os.path.join(SHALE_CHECKOUT, "src")
 SHALE_BUILT = WEBBOX_BUILT
+# cobble-webbox's checkout, whose `codex_chat` (Codex Chat, under
+# /codex-chat) angry-gopher's kernel compiles, with the page it embeds.
+COBBLE_ROOT = os.path.realpath(os.environ.get("COBBLE_ROOT", os.path.join(ROOT, "..", "cobble-webbox")))
+COBBLE_SRC = os.path.join(COBBLE_ROOT, "src")
+COBBLE_BUILT = ("src", "web/chat.html")
 VERDICT_DIR = os.environ.get("GATES_VERDICT_DIR", os.path.expanduser("~/build/zig-metal-unikernel/verdicts"))
 SDK = os.environ.get("COVERAGE_SDK", os.path.join(os.path.dirname(ROOT), "zig-coverage-sdk"))
 TIERS = ("gates", "long")
@@ -135,7 +140,8 @@ def content_id() -> str:
     h = hashlib.sha256()
     for repo, root, rels in (("angry-gopher", GOPHER_ROOT, served_files()),
                              ("zig-webbox", WEBBOX_ROOT, sorted(walk(WEBBOX_ROOT, WEBBOX_BUILT))),
-                             ("shale", SHALE_CHECKOUT, sorted(walk(SHALE_CHECKOUT, SHALE_BUILT)))):
+                             ("shale", SHALE_CHECKOUT, sorted(walk(SHALE_CHECKOUT, SHALE_BUILT))),
+                             ("cobble-webbox", COBBLE_ROOT, sorted(walk(COBBLE_ROOT, COBBLE_BUILT)))):
         for rel in rels:
             h.update(f"{repo}/{rel}".encode() + b"\0")
             try:
@@ -237,6 +243,8 @@ def require() -> list:
         why.append("zig-webbox has uncommitted changes")
     if git(SHALE_CHECKOUT, "status", "--porcelain", "--untracked-files=no", "--", *SHALE_BUILT):
         why.append("shale has uncommitted changes")
+    if git(COBBLE_ROOT, "status", "--porcelain", "--untracked-files=no", "--", *COBBLE_BUILT):
+        why.append("cobble-webbox has uncommitted changes")
     for tier in TIERS:
         try:
             with open(verdict_path(tier, ours, theirs)) as f:
@@ -277,9 +285,11 @@ def freshness() -> str:
         return f"no zig-webbox sources at {WEBBOX_SRC} (WEBBOX_ROOT)"
     if not os.path.isdir(SHALE_SRC):
         return f"no shale sources at {SHALE_SRC} (SHALE_CHECKOUT)"
+    if not os.path.isdir(COBBLE_SRC):
+        return f"no cobble-webbox sources at {COBBLE_SRC} (COBBLE_ROOT)"
     escaped = []
     # Every folder down: Shale's interpreter is in shale's src/script/.
-    for src in (SRC, WEBBOX_SRC, SHALE_SRC):
+    for src in (SRC, WEBBOX_SRC, SHALE_SRC, COBBLE_SRC):
         for folder, _, names in sorted(os.walk(src)):
             for name in sorted(names):
                 if name.endswith(".zig") and name != "host_io_std.zig":

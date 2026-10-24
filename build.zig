@@ -181,6 +181,11 @@ pub fn build(b: *std.Build) void {
     // machine's `host_io`. -Dshale-root=<dir> names another checkout.
     const shale_root = b.option([]const u8, "shale-root", "the shale checkout") orelse
         pathFromRoot(b, "../shale");
+    // **CODEX CHAT**, cobble-webbox's `codex_chat`, which angry-gopher serves
+    // under /codex-chat, from its own checkout, compiled as webbox is, with
+    // this machine's `host_io`. -Dcobble-root=<dir> names another checkout.
+    const cobble_root = b.option([]const u8, "cobble-root", "the cobble-webbox checkout") orelse
+        pathFromRoot(b, "../cobble-webbox");
 
     const all = b.step("kernels", "every kernel");
     for (kernels) |k| {
@@ -264,6 +269,14 @@ pub fn build(b: *std.Build) void {
         .red_zone = false,
         .imports = &.{ .{ .name = "host_io", .module = host_io }, .{ .name = "webbox", .module = webbox } },
     });
+    // angry-gopher's own import, not every application's: the chat's
+    // routes, setup and page, as cobble-webbox's build.zig makes it.
+    const codex_chat = b.createModule(.{
+        .root_source_file = .{ .cwd_relative = b.fmt("{s}/src/chat_app.zig", .{cobble_root}) },
+        .red_zone = false,
+        .imports = &.{ .{ .name = "host_io", .module = host_io }, .{ .name = "webbox", .module = webbox } },
+    });
+    codex_chat.addAnonymousImport("chat_page", .{ .root_source_file = .{ .cwd_relative = b.fmt("{s}/web/chat.html", .{cobble_root}) } });
     // The kernel's parts every application's kernel shares, exported for
     // `addAppKernel` (a dependent package reaches them through it, not by
     // name): `metal`, `host_io`, `webbox` and `shale` above, and `gm_build`.
@@ -276,7 +289,10 @@ pub fn build(b: *std.Build) void {
     // (`addAppKernel`, below).
     const gopher_app = b.createModule(.{
         .root_source_file = .{ .cwd_relative = b.fmt("{s}/router.zig", .{gopher_src}) },
-        .imports = &.{.{ .name = "build_options", .module = build_opts.createModule() }},
+        .imports = &.{
+            .{ .name = "build_options", .module = build_opts.createModule() },
+            .{ .name = "codex_chat", .module = codex_chat },
+        },
     });
     const gopher = appKernel(b, b, .{
         .name = "gopher.elf",
@@ -341,7 +357,7 @@ pub fn build(b: *std.Build) void {
         if (p == .none) continue;
         // The same port and checkout as this build's, or gopher.elf is
         // checked against the defaults' (or not at all) for every plant.
-        const one = b.addSystemCommand(&.{ b.graph.zig_exe, "build", "check", "check-apps", "-Dcoverage", b.fmt("-Dplant={s}", .{@tagName(p)}), b.fmt("-Dgopher-root={s}", .{gopher_root}), b.fmt("-Dwebbox-root={s}", .{webbox_root}), b.fmt("-Dshale-root={s}", .{shale_root}) });
+        const one = b.addSystemCommand(&.{ b.graph.zig_exe, "build", "check", "check-apps", "-Dcoverage", b.fmt("-Dplant={s}", .{@tagName(p)}), b.fmt("-Dgopher-root={s}", .{gopher_root}), b.fmt("-Dwebbox-root={s}", .{webbox_root}), b.fmt("-Dshale-root={s}", .{shale_root}), b.fmt("-Dcobble-root={s}", .{cobble_root}) });
         one.setCwd(b.path("."));
         check_plants.dependOn(&one.step);
     }
@@ -361,7 +377,7 @@ pub fn build(b: *std.Build) void {
     // asset list is its table. tools/verdicts.py says whether it is fresh, as
     // gates.sh asks it, and one not fresh fails the check.
     const port_state: []const u8 = blk: {
-        const out = b.runAllowFail(&.{ "env", b.fmt("GOPHER_ROOT={s}", .{gopher_root}), b.fmt("WEBBOX_ROOT={s}", .{webbox_root}), b.fmt("SHALE_CHECKOUT={s}", .{shale_root}), "python3", pathFromRoot(b, "tools/verdicts.py"), "fresh" }, &port_code, .ignore) catch break :blk "tools/verdicts.py could not be run";
+        const out = b.runAllowFail(&.{ "env", b.fmt("GOPHER_ROOT={s}", .{gopher_root}), b.fmt("WEBBOX_ROOT={s}", .{webbox_root}), b.fmt("SHALE_CHECKOUT={s}", .{shale_root}), b.fmt("COBBLE_ROOT={s}", .{cobble_root}), "python3", pathFromRoot(b, "tools/verdicts.py"), "fresh" }, &port_code, .ignore) catch break :blk "tools/verdicts.py could not be run";
         break :blk std.mem.trim(u8, out, " \t\r\n");
     };
     if (std.mem.eql(u8, port_state, "fresh")) {
