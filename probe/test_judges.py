@@ -71,6 +71,24 @@ class Normalize(unittest.TestCase):
         an_hour_off = G.eastern(1789600050 + 3600)
         self.assertEqual(G.normalize(an_hour_off, self.W), an_hour_off)
 
+    def test_a_codex_chat_stamp_in_a_minute_the_window_touches_is_now(self):
+        # The window runs 23:06:40 to 23:08:10 UTC.
+        for hhmm in (b"23:06", b"23:08"):
+            with self.subTest(hhmm=hhmm):
+                self.assertEqual(G.normalize(b'{"time-0":"' + hhmm + b'"}', self.W), b'{"time-0":"<NOW-HHMM>"}')
+        self.assertEqual(G.normalize(b'{"id":1,"time":"23:07"}', self.W), b'{"id":1,"time":"<NOW-HHMM>"}')
+
+    def test_a_codex_chat_stamp_outside_the_window_is_left_alone(self):
+        for data in (b'{"time-0":"23:09"}', b'{"time":"22:07"}', b'{"other":"23:07"}'):
+            with self.subTest(data=data):
+                self.assertEqual(G.normalize(data, self.W), data)
+
+    def test_a_codex_chat_token_is_named_for_its_holder(self):
+        tokens = {"ann": "5a05516c60cef1f8"}
+        data = b'{"name":"ann","token":"5a05516c60cef1f8"}'
+        self.assertEqual(G.normalize(data, self.W, tokens), b'{"name":"ann","token":"<TOKEN ann>"}')
+        self.assertEqual(G.normalize(data, self.W), data)
+
 
 class MoreNormalize(unittest.TestCase):
     W = (1789600000, 1789600090)

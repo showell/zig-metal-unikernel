@@ -116,6 +116,35 @@ CASES = [
 JAR = "$JAR"
 
 
+# **CODEX CHAT'S SESSIONS ARE THE ANSWER'S, NOT THE COOKIE JAR'S**: register
+# answers a random token, and every later request carries it in its query
+# (`t=`). `chat_token("ann")` in a step's path is the token THIS side gave the
+# registration of ann.
+CHAT_REGISTER = re.compile(r"/codex-chat/api/chat/register\?name=([a-z]+)$")
+
+
+def chat_token(name: str) -> str:
+    return f"$CHAT:{name}"
+
+
+def with_chat_tokens(c: dict, tokens: dict) -> dict:
+    path = c["path"]
+    for name, token in tokens.items():
+        path = path.replace(chat_token(name), token)
+    return dict(c, path=path)
+
+
+def update_chat_tokens(c: dict, answer: dict, tokens: dict) -> dict:
+    m = CHAT_REGISTER.search(c["path"])
+    if not m or answer.get("status") != 200:
+        return tokens
+    try:
+        token = json.loads(answer["body"])["token"]
+    except (ValueError, KeyError, TypeError):
+        return tokens
+    return dict(tokens, **{m.group(1): token})
+
+
 def step(name, method, path, cookie=None, body=None, raw=None, headers=(), settle=0.0, expect=()):
     """One request in a story. `settle` waits before sending it.
 
@@ -347,6 +376,29 @@ LYNRUMMY_STORY = [
     step("its second", "POST", "/puzzles/sessions/1/puzzles/0/actions", JAR, "2) move"),
     step("the puzzles page, reloaded", "GET", "/puzzles", JAR),
     step("the game roster", "GET", "/admin/lynrummy", FRESH),
+]
+
+
+# CODEX CHAT, under /codex-chat beside Gopher Chat: Damian's ChatServer compiled
+# from Codex, its state in data/codex-chat/ (a file per account, a folder per
+# conversation with its messages appended).
+CHAT_API = "/codex-chat/api/chat"
+CODEX_CHAT_STORY = [
+    step("codex chat, without its slash", "GET", "/codex-chat"),
+    step("codex chat's page", "GET", "/codex-chat/"),
+    step("ann registers", "GET", f"{CHAT_API}/register?name=ann"),
+    step("bob registers", "GET", f"{CHAT_API}/register?name=bob"),
+    step("ann, by her token", "GET", f"{CHAT_API}/me?t={chat_token('ann')}"),
+    step("a token nobody holds", "GET", f"{CHAT_API}/me?t=0000000000000000"),
+    step("ann starts a chat with bob", "GET", f"{CHAT_API}/start?t={chat_token('ann')}&with=bob"),
+    step("ann writes", "GET", f"{CHAT_API}/send?t={chat_token('ann')}&to=c1&body=hi%20bob"),
+    step("bob answers", "GET", f"{CHAT_API}/send?t={chat_token('bob')}&to=c1&body=hi%20ann"),
+    step("bob reads the chat", "GET", f"{CHAT_API}/messages?t={chat_token('bob')}&conv=c1"),
+    step("bob's conversations", "GET", f"{CHAT_API}/conversations?t={chat_token('bob')}"),
+    step("ann makes a group", "GET", f"{CHAT_API}/group?t={chat_token('ann')}&name=all&members=ann,bob"),
+    step("ann writes to it", "GET", f"{CHAT_API}/send?t={chat_token('ann')}&to=c2&body=hello%20all"),
+    step("ann's conversations", "GET", f"{CHAT_API}/conversations?t={chat_token('ann')}"),
+    step("a route codex chat lacks", "GET", "/codex-chat/api/nope"),
 ]
 
 
@@ -798,7 +850,7 @@ QUICK = bool(os.environ.get("JUDGE_QUICK"))
 # answerable in one of those minutes. `JUDGE_ONLY=uploads` (probe/run.sh gopher
 # uploads) runs that gate and nothing else. An unknown name is an error, not a
 # silently complete run.
-GATES = ["cases", "members", "uids", "caps", "lynrummy", "streams-linux", "streams-metal", "budget", "churn",
+GATES = ["cases", "members", "uids", "caps", "lynrummy", "codex-chat", "streams-linux", "streams-metal", "budget", "churn",
          "bulk", "uploads", "lagging", "concurrent",
          "damaged", "endurance", "stamina", "admin-reset", "throttle", "retire", "secret", "shale-background"]
 # The boots that exist to be long. The quick tier leaves them out; asking for
@@ -1142,6 +1194,9 @@ COMPARED_HEADERS = ("location", "set-cookie", "content-type")
 UNIX_TIME = re.compile(rb"\b1[5-9]\d{8}\b")
 RFC3339 = re.compile(rb"\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\b")
 SESSION_MAC = re.compile(rb"\.<NOW>\.[A-Za-z0-9_-]{43}")
+# Codex Chat's stamp on a message, UTC `HH:mm`, as its answers and its files
+# spell it.
+CHAT_TIME = re.compile(rb'"time(-\d+)?":"(\d\d:\d\d)"')
 
 
 EASTERN = zoneinfo.ZoneInfo("America/New_York")
@@ -1154,15 +1209,24 @@ def eastern(unix: int) -> bytes:
     return d.strftime("%b %-d, %Y · %-I:%M %p %Z").encode()
 
 
-def normalize(data: bytes, window) -> bytes:
+def normalize(data: bytes, window, tokens=None) -> bytes:
     """Replace a time with <NOW> — but only one inside `window`, the span in which
     this side handled the request. A time outside it is left as it is, so a
     wrong clock is a difference rather than a wildcard.
 
     Two spellings: a Unix time, and the Eastern wall-clock text the session
     pages render. The second is minute-precise, so every minute the window
-    touches is tried."""
+    touches is tried, as for Codex Chat's UTC `HH:mm`.
+
+    `tokens` are the Codex Chat sessions this side handed out (`chat_tokens`),
+    each named for its holder: random, so the same story mints different ones."""
     lo, hi = window
+    for name, token in (tokens or {}).items():
+        data = data.replace(token.encode(), b"<TOKEN " + name.encode() + b">")
+    # Every minute holding a second of the window, and none after it.
+    touched = range(lo - lo % 60, hi + 1, 60)
+    minutes = {time.strftime("%H:%M", time.gmtime(t)).encode() for t in touched}
+    data = CHAT_TIME.sub(lambda m: m.group(0).replace(m.group(2), b"<NOW-HHMM>") if m.group(2) in minutes else m.group(0), data)
 
     def sub(m):
         return b"<NOW>" if lo <= int(m.group(0)) <= hi else m.group(0)
@@ -1177,7 +1241,7 @@ def normalize(data: bytes, window) -> bytes:
     # A session cookie minted in the window: its MAC covers the time, so it
     # differs whenever the time does.
     data = SESSION_MAC.sub(b".<NOW>.<MAC>", data)
-    for minute in range(lo - lo % 60, hi + 60, 60):
+    for minute in touched:
         data = data.replace(eastern(minute), b"<NOW-EASTERN>")
     return data
 
@@ -1217,8 +1281,8 @@ def differences(c: dict, metal: dict, linux: dict) -> list:
         # whole below; only the page itself differs on purpose.
         out += host_page_differences(metal["body"], linux["body"], metal.get("image"), metal.get("boot_disk"))
     else:
-        mb = normalize(metal["body"], metal["window"])
-        lb = normalize(linux["body"], linux["window"])
+        mb = normalize(metal["body"], metal["window"], metal.get("tokens"))
+        lb = normalize(linux["body"], linux["window"], linux.get("tokens"))
         if mb != lb:
             out.append(f"body differs: {len(mb)} bytes on metal, {len(lb)} on Linux"
                        f"{first_difference(mb, lb)}")
@@ -1614,7 +1678,7 @@ def run_story(elf, linux_bin, content, pristine, work, mnt, steps, label, report
 
     before = time.time()
     qemu, port, serial = start_kernel(elf, image, scratch)
-    metal_answers, jar = [], {}
+    metal_answers, jar, metal_tokens = [], {}, {}
     for i, s in enumerate(steps):
         if s.get("settle"):
             time.sleep(s["settle"])
@@ -1623,8 +1687,9 @@ def run_story(elf, linux_bin, content, pristine, work, mnt, steps, label, report
             # would only wait for a connection that will never come.
             metal_answers.append({"error": f"the kernel had already exited ({qemu.returncode})"})
             continue
-        a = ask(port, with_jar(s, jar, minted), os.path.join(scratch, f"k{i}"))
+        a = ask(port, with_chat_tokens(with_jar(s, jar, minted), metal_tokens), os.path.join(scratch, f"k{i}"))
         jar = update_jar(a, jar)
+        metal_tokens = update_chat_tokens(s, a, metal_tokens)
         metal_answers.append(a)
     code, log = finish_kernel(qemu, serial)
     metal_window = (int(before) - 1, int(time.time()) + 1)
@@ -1633,7 +1698,7 @@ def run_story(elf, linux_bin, content, pristine, work, mnt, steps, label, report
     shutil.copytree(content, root)
     before = time.time()
     server = LinuxServer(linux_bin, root, os.path.join(scratch, "linux.log"))
-    linux_answers, jar = [], {}
+    linux_answers, jar, linux_tokens = [], {}, {}
     try:
         for i, s in enumerate(steps):
             if s.get("settle"):
@@ -1644,8 +1709,9 @@ def run_story(elf, linux_bin, content, pristine, work, mnt, steps, label, report
             if server.proc.poll() is not None:
                 linux_answers.append({"error": f"the Linux server had exited ({server.proc.returncode}): {server.last_words()}"})
                 continue
-            a = ask(server.port, with_jar(s, jar, minted), os.path.join(scratch, f"l{i}"))
+            a = ask(server.port, with_chat_tokens(with_jar(s, jar, minted), linux_tokens), os.path.join(scratch, f"l{i}"))
             jar = update_jar(a, jar)
+            linux_tokens = update_chat_tokens(s, a, linux_tokens)
             linux_answers.append(a)
     finally:
         server.stop()
@@ -1668,8 +1734,8 @@ def run_story(elf, linux_bin, content, pristine, work, mnt, steps, label, report
                + " | ".join(log.splitlines()[-3:]))
     for s, m, l in zip(steps, metal_answers, linux_answers):
         m = dict(m, guest_exit=1, window=metal_window, serial=log, image=image,
-                 boot_disk=os.path.join(scratch, "droplet.img") if DROPLET else None)
-        l = dict(l, window=linux_window)
+                 boot_disk=os.path.join(scratch, "droplet.img") if DROPLET else None, tokens=metal_tokens)
+        l = dict(l, window=linux_window, tokens=linux_tokens)
         diffs = differences(s, m, l)
         if diffs:
             failures += 1
@@ -1715,8 +1781,8 @@ def run_story(elf, linux_bin, content, pristine, work, mnt, steps, label, report
     for rel in sorted(set(metal_tree) | set(linux_tree)):
         m = metal_tree.get(rel)
         l = linux_tree.get(rel)
-        nm = None if m is None else normalize(m, metal_window)
-        nl = None if l is None else normalize(l, linux_window)
+        nm = None if m is None else normalize(m, metal_window, metal_tokens)
+        nl = None if l is None else normalize(l, linux_window, linux_tokens)
         if nm != nl:
             failures += 1
             report(f"FAIL  {label}: {rel}: metal has {abbrev(nm)}, Linux has {abbrev(nl)}")
@@ -3516,6 +3582,45 @@ def main() -> int:
                   f"and its moves, a puzzle and its moves, both reloaded, the roster — each answered as "
                   f"Linux answered, all {files} files agree")
         lap("Lyn Rummy story")
+
+    # ── Codex Chat ───────────────────────────────────────────────────────────
+    if running("codex-chat"):
+        f, _, answers, files = run_story(elf, linux_bin, content, pristine, work, mnt,
+                                         CODEX_CHAT_STORY, "codex-chat", print)
+        failures += f
+        # As each step's name says, not merely alike on both. ChatServer
+        # answers its own refusals 200 with an "error" in the JSON.
+        by_name = {s["name"]: a for s, a in zip(CODEX_CHAT_STORY, answers)}
+        body = lambda name: by_name[name].get("body") or b""
+        want = {s["name"]: 200 for s in CODEX_CHAT_STORY}
+        want.update({"codex chat, without its slash": 303, "a route codex chat lacks": 200})
+        wrong = [f"{name} answered {by_name[name].get('status')}, want {st}"
+                 for name, st in want.items() if by_name[name].get("status") != st]
+        if not wrong:
+            checks = [
+                ("codex chat's page", b"<html"),
+                ("ann registers", b'"name":"ann"'),
+                ("ann, by her token", b'{"name":"ann"}'),
+                ("a token nobody holds", b'{"error":"auth"}'),
+                ("ann starts a chat with bob", b'{"convId":"c1"}'),
+                ("ann writes", b'{"ok":true}'),
+                ("bob reads the chat", b'"body-0":"hi bob","sender-0":"ann"'),
+                ("bob reads the chat", b'"body-1":"hi ann","sender-1":"bob"'),
+                ("ann makes a group", b'{"convId":"c2"}'),
+                ("ann's conversations", b'"name-1":"all","preview-1":"hello all"'),
+            ]
+            wrong += [f"{name} answered {body(name)[:120]!r}, which lacks {piece!r}"
+                      for name, piece in checks if piece not in body(name)]
+            if not re.fullmatch(rb'\{"token":"[0-9a-f]{16}","name":"ann"\}', body("ann registers")):
+                wrong.append(f"ann's registration is not a 16-digit token: {body('ann registers')!r}")
+        for w in wrong:
+            failures += 1
+            print(f"FAIL  codex-chat: {w}")
+        if not f and not wrong:
+            print(f"ok    the Codex Chat story: {len(CODEX_CHAT_STORY)} requests to ONE boot under "
+                  f"/codex-chat — two accounts, a chat and a group, written and read back — each "
+                  f"answered as Linux answered, all {files} files agree")
+        lap("Codex Chat story")
 
     # ── a live stream, on both ───────────────────────────────────────────────
     if running("streams-linux"):
