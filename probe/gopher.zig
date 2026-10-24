@@ -629,7 +629,7 @@ pub fn kmain() noreturn {
     // session's last-message record (as Linux does, so the two hosts leave
     // the same files behind, which the judge compares), and search's index.
     // Each one-time pass reads on an arena `start` gives back.
-    var started = app.site.start(io, .{
+    const started = app.site.start(io, .{
         .roots = .{ .data_dir = data_dir, .auth_dir = auth_dir },
         .free_space = .{ .reader = dataSpace },
         .trusted_proxy = trusted_proxy,
@@ -644,7 +644,7 @@ pub fn kmain() noreturn {
         serial.put("\n");
         serial.fail("the host contract's setup (app.site.start) failed");
     };
-    const hub = &started.hub;
+    const hub = started.hub;
     // **DURABLE ON DEMAND** (metal-vmm QUEUE 200): the script route's
     // sequence number is flushed before its script runs, and a failed
     // flush refuses the run.
