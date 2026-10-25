@@ -11,7 +11,7 @@
 --
 -- `work` keeps the disk: a second boot finds the first's data on it (delete
 -- `work`'s disk.img for a fresh one). The serial is `work`'s serial.log;
--- `job_stop` on its `.job` stops the machine. `mem` is MB (512). For trying
+-- `job_stop("<work>/serial.log.job")` stops the machine. `mem` is MB (512). For trying
 -- a kernel by hand, not a gate: a release is judged by probe/judge_gopher.py
 -- or the application's own gate.
 --
@@ -51,7 +51,7 @@ if not exists(disk) then
 end
 
 const log = path(WORK, "serial.log")
-if exists(log .. ".job") and job_alive(log) then fail("boot_app: a machine already runs on " .. WORK .. " (job_stop its serial.log)") end
+if exists(log .. ".job") and job_alive(log .. ".job") then fail("boot_app: a machine already runs on " .. WORK .. " (job_stop its serial.log.job)") end
 const job = job_start({"qemu-system-x86_64", "-M", "microvm,rtc=on,pit=on", "-kernel", real(ELF),
   "-nographic", "-no-reboot", "-m", tostring(MEM),
   "-global", "virtio-mmio.force-legacy=false",
