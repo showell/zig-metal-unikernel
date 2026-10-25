@@ -307,6 +307,10 @@ MEMBER_STORY = [
     step("still serving after garbage", "GET", "/nope"),
     step("a connection that says nothing", "RAW", "-", raw=b""),
     step("still serving after silence", "GET", "/chat"),
+    # A POST with neither Content-Length nor Transfer-Encoding has an empty
+    # body (RFC 9112 6.3); std's server asserts on it as it answers.
+    step("a POST that gives no length", "RAW", "-", raw=b"POST /login/full HTTP/1.1\r\nHost: x\r\n\r\n"),
+    step("still serving after a POST with no length", "GET", "/nope"),
 ]
 
 
@@ -1283,6 +1287,11 @@ def differences(c: dict, metal: dict, linux: dict) -> list:
     else:
         mb = normalize(metal["body"], metal["window"], metal.get("tokens"))
         lb = normalize(linux["body"], linux["window"], linux.get("tokens"))
+        if c.get("raw") is not None:
+            # Metal always closes a connection; Linux may keep an HTTP/1.1 one
+            # open. A raw step that must stay kept-alive (the no-length POST)
+            # differs by that header alone, which is not what it is about.
+            mb, lb = mb.replace(b"connection: close\r\n", b""), lb.replace(b"connection: close\r\n", b"")
         if mb != lb:
             out.append(f"body differs: {len(mb)} bytes on metal, {len(lb)} on Linux"
                        f"{first_difference(mb, lb)}")
