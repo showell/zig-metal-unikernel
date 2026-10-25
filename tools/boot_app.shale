@@ -1,0 +1,69 @@
+-- **AN APPLICATION'S KERNEL, BOOTED UNDER QEMU TO TRY IT** (addAppKernel's
+-- kernels: dog-park's dogpark.elf and dogpark-todo.elf, roc-webbox's
+-- roc-todo.elf): a 64 MiB GPT disk, partition 1 FAT16 at sector 2048 (Dog
+-- Park's metal gate's recipe), each `site` folder laid onto it, then QEMU as
+-- a job that outlives this run, port 80 forwarded to 0.0.0.0:`port`. It is
+-- ready when the serial says the kernel listens.
+--
+--   shale repos:zig-metal-unikernel/tools/boot_app.shale \
+--     elf=repos:dog-park/zig-out/bin/dogpark-todo.elf work=scratch:qemu/dogpark-todo \
+--     port=9215 site=repos:dog-park/solo
+--
+-- `work` keeps the disk: a second boot finds the first's data on it (delete
+-- `work`'s disk.img for a fresh one). The serial is `work`'s serial.log;
+-- `job_stop` on its `.job` stops the machine. `mem` is MB (512). For trying
+-- a kernel by hand, not a gate: a release is judged by probe/judge_gopher.py
+-- or the application's own gate.
+--
+-- budget: steps=5000000
+
+const ELF = arg("elf", "")
+const WORK = arg("work", "")
+const PORT = arg("port", 0)
+const MEM = arg("mem", 512)
+const SITE = arg("site", "")
+
+if ELF == "" or WORK == "" or PORT == 0 then fail("boot_app: say elf=, work= and port= (and site=, its folders, comma-separated)") end
+if not exists(ELF) then fail("boot_app: no kernel at " .. ELF) end
+
+const FIRST = 2048
+const env = {MTOOLS_SKIP_CHECK = "1", TZ = "UTC"}
+const disk = path(WORK, "disk.img")
+
+function tool(argv) return must(run(argv, {timeout_ms = 60000, tail = 20, env = env})) end
+
+if not exists(disk) then
+  mkdir(WORK)
+  tool({"truncate", "-s", "64M", real(disk)})
+  tool({"sgdisk", "-o", "-n", "1:" .. FIRST .. ":0", "-t", "1:0700", "-c", "1:app", real(disk)})
+  local last = nil
+  for l in lines(tool({"sgdisk", "-i", "1", real(disk)}).out) do
+    if starts_with(l, "Last sector:") then last = parse_int(words(l)[3]) end
+  end
+  if last == nil then fail("boot_app: sgdisk named no last sector") end
+  tool({"mkfs.vfat", "-F", "16", "-S", "512", "-n", "APP", "--offset", tostring(FIRST), real(disk), tostring((last - FIRST + 1) // 2)})
+  if SITE ~= "" then
+    for d in split(SITE, ",") do
+      tool({"mcopy", "-s", "-m", "-o", "-D", "o", "-i", real(disk) .. "@@" .. (FIRST * 512), real(d), "::/"})
+    end
+  end
+  print("boot_app: a fresh disk in " .. WORK)
+end
+
+const log = path(WORK, "serial.log")
+if exists(log .. ".job") and job_alive(log) then fail("boot_app: a machine already runs on " .. WORK .. " (job_stop its serial.log)") end
+const job = job_start({"qemu-system-x86_64", "-M", "microvm,rtc=on,pit=on", "-kernel", real(ELF),
+  "-nographic", "-no-reboot", "-m", tostring(MEM),
+  "-global", "virtio-mmio.force-legacy=false",
+  "-device", "isa-debug-exit,iobase=0xf4,iosize=0x04",
+  "-drive", "id=d,file=" .. real(disk) .. ",format=raw,if=none,cache=unsafe",
+  "-device", "virtio-blk-device,drive=d",
+  "-cpu", "max", "-device", "virtio-rng-device",
+  "-netdev", "user,id=n0,hostfwd=tcp:0.0.0.0:" .. PORT .. "-:80",
+  "-device", "virtio-net-device,netdev=n0"}, {log = log})
+const up = job_wait(job, {timeout_ms = 100000, contains = "listening on port 80"})
+if up.ended ~= "found" then
+  for l in tail_lines(log, 5) or {} do print(l) end
+  fail("boot_app: the kernel never said it listens (" .. up.ended .. ")")
+end
+print("boot_app: listening on :" .. PORT .. "; the serial in " .. log)

@@ -324,7 +324,12 @@ settings, among them forwarding a local port to the guest's port 80.
 of real data and compares it with Linux, page by page.
 [`docs/probes.md`](docs/probes.md) says what each test kernel checks.
 
-**Booting another application's kernel by hand:** lay it on a disk with
+**Booting another application's kernel to try it:**
+`shale repos:zig-metal-unikernel/tools/boot_app.shale elf=<kernel> work=<folder>
+port=<N> site=<folders>` (its header): a GPT disk with a FAT16 partition, the
+site folders laid on it, and QEMU's microvm as a job that outlives the run,
+its serial in `<work>/serial.log`; the disk is kept for the next boot. As a
+droplet boots it: lay it on a disk image with
 `droplet/app_image.py <kernel.elf> <site-dir> <conf> <out.img>` (its
 docstring), then `DISK=<out.img> PUBLIC_FWD=8080 droplet/droplet.sh` and
 browse `localhost:8080`. The conf is `zig-metal-unikernel.conf`'s lines
