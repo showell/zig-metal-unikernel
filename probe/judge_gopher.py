@@ -2089,8 +2089,10 @@ def tab_story(port: int, scratch: str, report, label: str, keepalive: float = 25
         live = got[conv].partition(b"tab-live")[0].rpartition(b"id: ")[2] + b"tab-live"
         if b"tab-live" not in got[conv]:
             fail("the message never reached her conversation stream")
-        elif b'"mine":false' not in got[conv][got[conv].rfind(b"id: "):]:
-            fail(f"his message is marked as hers on her stream: {live[:120]!r}")
+        # The frame is the same for every viewer (angry-gopher e4a0f607): it
+        # names the sender, and her page decides `mine` from its own name.
+        elif b'"from":"Steve"' not in live or b'"mine"' in live:
+            fail(f"his message on her stream does not name him alone, viewer-free: {live[:120]!r}")
         got[notify] = read_until(notify, b"Steve sent you a message on tab.", time.time() + 15, got[notify])
         if b"Steve sent you a message on tab." not in got[notify]:
             fail(f"her notifications never said he sent it: {got[notify][-160:]!r}")
