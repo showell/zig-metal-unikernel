@@ -69,6 +69,10 @@ pub const coverage_checks = gm_build.coverage;
 /// built on as `webbox`. Nothing else of either is reached from here.
 const app = @import("app");
 const webbox = @import("webbox");
+/// **ROC'S RUNTIME, WHEN THE APPLICATION HOLDS TWO ROC APPS** (roc-webbox's
+/// roc_hooks.zig, which such a combination's root declares): the apps look
+/// for it in the binary's root, which is this file. None, `struct {}`.
+pub const roc_hooks = if (@hasDecl(app, "roc_hooks")) app.roc_hooks else struct {};
 const config_file = @import("config.zig");
 const volumes = @import("volumes.zig");
 const host_facts_file = @import("host_facts.zig");

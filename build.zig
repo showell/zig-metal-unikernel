@@ -931,6 +931,13 @@ pub const App = struct {
     /// ReleaseSafe for anything served; Debug only to iterate (`-Ddev`
     /// says why the kernel cannot take Debug's C sanitizer).
     optimize: std.builtin.OptimizeMode,
+    /// **THE APPLICATIONS A COMBINATION IS MADE OF** (webbox's combo): the
+    /// modules `module` imports that are applications themselves, each with
+    /// its own assets.zon, each taking this machine's `host_io`, `webbox`
+    /// and `shale` as `module` does. None for one application.
+    parts: []const Part = &.{},
+
+    pub const Part = struct { module: *std.Build.Module, assets: std.Build.LazyPath };
 };
 
 /// **ANY APPLICATION, AS A KERNEL: THE PUBLIC BUILD API.** Another
@@ -958,32 +965,8 @@ pub fn addAppKernel(b: *std.Build, kernel: *std.Build.Dependency, app: App) *std
 /// whether it is the root build (gopher.elf) or a dependency.
 fn appKernel(b: *std.Build, kb: *std.Build, a: App) *std.Build.Step.Compile {
     const m = a.module;
-    if (m.resolved_target != null or m.optimize != null)
-        std.process.fatal("addAppKernel({s}): the application's module names a target or optimize mode; it takes the kernel's (leave both unset)", .{a.name});
-    for ([_][]const u8{ "host_io", "webbox", "shale" }) |name| {
-        if (m.import_table.contains(name))
-            std.process.fatal("addAppKernel({s}): the application's module imports `{s}` itself; the kernel supplies this machine's (drop the import)", .{ a.name, name });
-    }
-    m.red_zone = false;
-    // The machine's imports first, then the caller's: the order the
-    // compiler meets them in is the order it numbers its generated types,
-    // which name symbols in the kernel's debug info.
-    const callers = m.import_table;
-    m.import_table = .empty;
-    m.addImport("host_io", exported(kb, "host_io"));
-    m.addImport("webbox", exported(kb, "webbox"));
-    m.addImport("shale", exported(kb, "shale"));
-    for (callers.keys(), callers.values()) |name, module| m.addImport(name, module);
-    // A page embeds these by name, and a name that no build graph declared is
-    // a compile error with a confusing message.
-    const assets_path = sourcePath(a.assets);
-    const base = std.fs.path.dirname(assets_path) orelse ".";
-    for (servedBy(b, assets_path).embedded) |e| {
-        if (m.import_table.contains(e.name)) continue;
-        m.addAnonymousImport(e.name, .{
-            .root_source_file = .{ .cwd_relative = b.fmt("{s}/{s}", .{ base, e.path }) },
-        });
-    }
+    machineImports(b, kb, a.name, m, a.assets);
+    for (a.parts) |part| machineImports(b, kb, a.name, part.module, part.assets);
     const exe = b.addExecutable(.{ .name = a.name, .root_module = kernelModule(b, kb.path("probe/gopher.zig"), a.optimize, &.{
         .{ .name = "metal", .module = exported(kb, "metal") },
         .{ .name = "app", .module = m },
@@ -997,6 +980,38 @@ fn appKernel(b: *std.Build, kb: *std.Build, a: App) *std.Build.Step.Compile {
     exe.setLinkerScript(kb.path("probe/link.ld"));
     exe.entry = .{ .symbol_name = "_start" };
     return exe;
+}
+
+/// An application's module (the whole, or a combination's part) made this
+/// machine's: the kernel's target and mode, its `host_io`, `webbox` and
+/// `shale`, and the files its assets.zon embeds by name.
+fn machineImports(b: *std.Build, kb: *std.Build, kernel: []const u8, m: *std.Build.Module, assets: std.Build.LazyPath) void {
+    if (m.resolved_target != null or m.optimize != null)
+        std.process.fatal("addAppKernel({s}): the application's module names a target or optimize mode; it takes the kernel's (leave both unset)", .{kernel});
+    for ([_][]const u8{ "host_io", "webbox", "shale" }) |lib| {
+        if (m.import_table.contains(lib))
+            std.process.fatal("addAppKernel({s}): the application's module imports `{s}` itself; the kernel supplies this machine's (drop the import)", .{ kernel, lib });
+    }
+    m.red_zone = false;
+    // The machine's imports first, then the caller's: the order the
+    // compiler meets them in is the order it numbers its generated types,
+    // which name symbols in the kernel's debug info.
+    const callers = m.import_table;
+    m.import_table = .empty;
+    m.addImport("host_io", exported(kb, "host_io"));
+    m.addImport("webbox", exported(kb, "webbox"));
+    m.addImport("shale", exported(kb, "shale"));
+    for (callers.keys(), callers.values()) |name, module| m.addImport(name, module);
+    // A page embeds these by name, and a name that no build graph declared is
+    // a compile error with a confusing message.
+    const assets_path = sourcePath(assets);
+    const base = std.fs.path.dirname(assets_path) orelse ".";
+    for (servedBy(b, assets_path).embedded) |e| {
+        if (m.import_table.contains(e.name)) continue;
+        m.addAnonymousImport(e.name, .{
+            .root_source_file = .{ .cwd_relative = b.fmt("{s}/{s}", .{ base, e.path }) },
+        });
+    }
 }
 
 fn exported(kb: *std.Build, name: []const u8) *std.Build.Module {
