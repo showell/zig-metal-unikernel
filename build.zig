@@ -277,6 +277,13 @@ pub fn build(b: *std.Build) void {
         .imports = &.{ .{ .name = "host_io", .module = host_io }, .{ .name = "webbox", .module = webbox } },
     });
     codex_chat.addAnonymousImport("chat_page", .{ .root_source_file = .{ .cwd_relative = b.fmt("{s}/web/chat.html", .{cobble_root}) } });
+    // And Damian's UO town (cobble-webbox's `uo_town`), the same way.
+    const uo_town = b.createModule(.{
+        .root_source_file = .{ .cwd_relative = b.fmt("{s}/src/uo_app.zig", .{cobble_root}) },
+        .red_zone = false,
+        .imports = &.{ .{ .name = "host_io", .module = host_io }, .{ .name = "webbox", .module = webbox } },
+    });
+    uo_town.addAnonymousImport("uo_town_page", .{ .root_source_file = .{ .cwd_relative = b.fmt("{s}/web/uo-town.html", .{cobble_root}) } });
     // The kernel's parts every application's kernel shares, exported for
     // `addAppKernel` (a dependent package reaches them through it, not by
     // name): `metal`, `host_io`, `webbox` and `shale` above, and `gm_build`.
@@ -292,6 +299,7 @@ pub fn build(b: *std.Build) void {
         .imports = &.{
             .{ .name = "build_options", .module = build_opts.createModule() },
             .{ .name = "codex_chat", .module = codex_chat },
+            .{ .name = "uo_town", .module = uo_town },
         },
     });
     const gopher = appKernel(b, b, .{

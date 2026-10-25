@@ -59,7 +59,7 @@ SHALE_BUILT = WEBBOX_BUILT
 # /codex-chat) angry-gopher's kernel compiles, with the page it embeds.
 COBBLE_ROOT = os.path.realpath(os.environ.get("COBBLE_ROOT", os.path.join(ROOT, "..", "cobble-webbox")))
 COBBLE_SRC = os.path.join(COBBLE_ROOT, "src")
-COBBLE_BUILT = ("src", "web/chat.html")
+COBBLE_BUILT = ("src", "web/chat.html", "web/uo-town.html")
 VERDICT_DIR = os.environ.get("GATES_VERDICT_DIR", os.path.expanduser("~/build/zig-metal-unikernel/verdicts"))
 SDK = os.environ.get("COVERAGE_SDK", os.path.join(os.path.dirname(ROOT), "zig-coverage-sdk"))
 TIERS = ("gates", "long")
