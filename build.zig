@@ -269,21 +269,13 @@ pub fn build(b: *std.Build) void {
         .red_zone = false,
         .imports = &.{ .{ .name = "host_io", .module = host_io }, .{ .name = "webbox", .module = webbox } },
     });
-    // angry-gopher's own import, not every application's: the chat's
-    // routes, setup and page, as cobble-webbox's build.zig makes it.
-    const codex_chat = b.createModule(.{
-        .root_source_file = .{ .cwd_relative = b.fmt("{s}/src/chat_app.zig", .{cobble_root}) },
-        .red_zone = false,
-        .imports = &.{ .{ .name = "host_io", .module = host_io }, .{ .name = "webbox", .module = webbox } },
-    });
-    codex_chat.addAnonymousImport("chat_page", .{ .root_source_file = .{ .cwd_relative = b.fmt("{s}/web/chat.html", .{cobble_root}) } });
-    // And Damian's UO town (cobble-webbox's `uo_town`), the same way.
-    const uo_town = b.createModule(.{
-        .root_source_file = .{ .cwd_relative = b.fmt("{s}/src/uo_app.zig", .{cobble_root}) },
-        .red_zone = false,
-        .imports = &.{ .{ .name = "host_io", .module = host_io }, .{ .name = "webbox", .module = webbox } },
-    });
-    uo_town.addAnonymousImport("uo_town_page", .{ .root_source_file = .{ .cwd_relative = b.fmt("{s}/web/uo-town.html", .{cobble_root}) } });
+    // angry-gopher's guests, which its router.zig mounts (webbox's combo):
+    // cobble-webbox's Codex Chat and UO town from that checkout, made this
+    // machine's as the gopher kernel's `parts`, their pages from
+    // cobble-webbox's assets.zon.
+    const codex_chat = b.createModule(.{ .root_source_file = .{ .cwd_relative = b.fmt("{s}/src/chat_app.zig", .{cobble_root}) } });
+    const uo_town = b.createModule(.{ .root_source_file = .{ .cwd_relative = b.fmt("{s}/src/uo_app.zig", .{cobble_root}) } });
+    const cobble_assets: std.Build.LazyPath = .{ .cwd_relative = b.fmt("{s}/assets.zon", .{cobble_root}) };
     // The kernel's parts every application's kernel shares, exported for
     // `addAppKernel` (a dependent package reaches them through it, not by
     // name): `metal`, `host_io`, `webbox` and `shale` above, and `gm_build`.
@@ -308,6 +300,10 @@ pub fn build(b: *std.Build) void {
         // assets.zon's embedded paths are relative to zig-server/.
         .assets = .{ .cwd_relative = b.fmt("{s}/zig-server/assets.zon", .{gopher_root}) },
         .optimize = optimize,
+        .parts = &.{
+            .{ .module = codex_chat, .assets = cobble_assets },
+            .{ .module = uo_town, .assets = cobble_assets },
+        },
     });
     const gopher_imports = [_]std.Build.Module.Import{
         .{ .name = "metal", .module = metal },

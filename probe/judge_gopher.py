@@ -854,7 +854,7 @@ QUICK = bool(os.environ.get("JUDGE_QUICK"))
 # answerable in one of those minutes. `JUDGE_ONLY=uploads` (probe/run.sh gopher
 # uploads) runs that gate and nothing else. An unknown name is an error, not a
 # silently complete run.
-GATES = ["cases", "members", "uids", "caps", "lynrummy", "codex-chat", "streams-linux", "streams-metal", "budget", "churn",
+GATES = ["cases", "members", "uids", "caps", "lynrummy", "codex-chat", "uo-town", "streams-linux", "streams-metal", "budget", "churn",
          "bulk", "uploads", "lagging", "concurrent",
          "damaged", "endurance", "stamina", "admin-reset", "throttle", "retire", "secret", "shale-background"]
 # The boots that exist to be long. The quick tier leaves them out; asking for
@@ -2886,6 +2886,96 @@ def metal_sse_failures(elf, pristine, work, mnt, report) -> int:
     return failures + metal_tab_failures(elf, pristine, work, mnt, report)
 
 
+def uo_town_failures(elf, pristine, work, mnt, report) -> int:
+    """**THE UO TOWN, ON THE MACHINE** (cobble-webbox's uo_town, mounted at /uo):
+    one boot, each answer held to what it must say, not to Linux's (the town's
+    answers carry its clocks and its host). The page and the map; a paused
+    town at six; a seat taken and walked; a speed set, then the town seen to
+    have moved on between requests (the kernel's `between`); a start-over."""
+    town = "/uo/town"
+    failures = 0
+
+    def fail(why):
+        nonlocal failures
+        failures += 1
+        report(f"FAIL  uo-town: {why}")
+
+    def now(label):
+        a = ask(port, step(label, "GET", f"{town}/now"), scratch, patience=60)
+        try:
+            return json.loads(a["body"]) if a.get("status") == 200 else None
+        except (ValueError, KeyError):
+            return None
+
+    asked = 11
+    scratch, qemu, port, serial = boot_with(elf, pristine, work, mnt, asked + 1)
+    try:
+        bare = ask(port, step("the town, without its slash", "GET", town), scratch, patience=60)
+        # Relative, as the town answers from its own `/` wherever it is
+        # mounted: `town/` from /uo/town is /uo/town/.
+        if bare.get("status") != 303 or bare.get("headers", {}).get("location") != "town/":
+            fail(f"{town} answered {bare.get('status')} to {bare.get('headers', {}).get('location')!r}, want 303 to town/")
+        page = ask(port, step("the page", "GET", f"{town}/"), scratch)
+        if page.get("status") != 200 or b"<html" not in page.get("body", b"").lower():
+            fail(f"the page answered {page.get('status')}, not a page")
+        shown = ask(port, step("the map", "GET", f"{town}/map"), scratch)
+        try:
+            shops = json.loads(shown["body"])["shops"]
+        except (ValueError, KeyError, TypeError):
+            shops = []
+        if shown.get("status") != 200 or not shops:
+            fail(f"the map answered {shown.get('status')} with no shops")
+        first = now("the town at the start")
+        if first is None:
+            fail("/now did not answer JSON")
+            first = {}
+        elif (first.get("speed"), first.get("hour")) != (0, 6) or not first.get("people") \
+                or first.get("server", {}).get("host") != "bare metal (the unikernel)":
+            fail(f"the town at the start is speed {first.get('speed')}, hour {first.get('hour')}, "
+                 f"{len(first.get('people', []))} people, host {first.get('server', {}).get('host')!r}: "
+                 f"want paused at six, people in it, on bare metal")
+        joined = ask(port, step("Ann joins", "POST", f"{town}/join?name=Ann"), scratch)
+        try:
+            token = json.loads(joined["body"])["token"]
+        except (ValueError, KeyError, TypeError):
+            token = ""
+        if joined.get("status") != 200 or not re.fullmatch(r"[0-9a-f]{16}", token):
+            fail(f"Ann's join answered {joined.get('status')} {joined.get('body', b'')[:80]!r}, not a seat's token")
+        walked = ask(port, step("Ann walks", "POST", f"{town}/go?t={token}&x=1460&y=1600"), scratch)
+        if walked.get("status") != 204:
+            fail(f"Ann's walk answered {walked.get('status')}, want 204")
+        stranger = ask(port, step("a token nobody holds", "POST", f"{town}/go?t=0000000000000000&x=1460&y=1600"), scratch)
+        if stranger.get("status") != 403:
+            fail(f"a walk by a token nobody holds answered {stranger.get('status')}, want 403")
+        sped = ask(port, step("the town set going", "POST", f"{town}/speed?x=600"), scratch)
+        if sped.get("status") != 204:
+            fail(f"setting the speed answered {sped.get('status')}, want 204")
+        time.sleep(2)
+        later = now("the town two seconds on") or {}
+        if later.get("speed") != 600 or not later.get("seconds", 0) > first.get("seconds", 0) \
+                or not later.get("server", {}).get("ticks", 0) > first.get("server", {}).get("ticks", 0):
+            fail(f"two seconds at speed 600 the town reads speed {later.get('speed')}, game second "
+                 f"{later.get('seconds')} (was {first.get('seconds')}), ticks {later.get('server', {}).get('ticks')} "
+                 f"(was {first.get('server', {}).get('ticks')}): it never moved on between requests")
+        reset = ask(port, step("the town started over", "POST", f"{town}/reset"), scratch)
+        if reset.get("status") != 204:
+            fail(f"the start-over answered {reset.get('status')}, want 204")
+        again = now("the town started over") or {}
+        if again.get("epoch") != first.get("epoch", 0) + 1 or (again.get("speed"), again.get("hour")) != (0, 6):
+            fail(f"after the start-over the town is epoch {again.get('epoch')} (was {first.get('epoch')}), "
+                 f"speed {again.get('speed')}, hour {again.get('hour')}: want the next epoch, paused at six")
+        ask(port, step("the last request", "GET", "/nope"), scratch, patience=60)
+    finally:
+        code, log = finish_kernel(qemu, serial)
+    if code != 1:
+        fail("the kernel exited " + str(code) + ": " + " | ".join(log.splitlines()[-3:]))
+    if not failures:
+        report(f"ok    the UO town on the machine: {asked} requests to ONE boot under {town} — the page, "
+               f"the map, a seat taken and walked, the town moving on between requests, a start-over")
+    shutil.rmtree(scratch, ignore_errors=True)
+    return failures
+
+
 def metal_tab_failures(elf, pristine, work, mnt, report) -> int:
     scratch = tempfile.mkdtemp(dir=work)
     image = os.path.join(scratch, "disk.img")
@@ -3630,6 +3720,11 @@ def main() -> int:
                   f"/codex-chat — two accounts, a chat and a group, written and read back — each "
                   f"answered as Linux answered, all {files} files agree")
         lap("Codex Chat story")
+
+    # ── the UO town, on the machine ──────────────────────────────────────────
+    if running("uo-town"):
+        failures += uo_town_failures(elf, pristine, work, mnt, print)
+        lap("UO town")
 
     # ── a live stream, on both ───────────────────────────────────────────────
     if running("streams-linux"):

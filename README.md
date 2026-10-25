@@ -262,7 +262,7 @@ options of the dependency. `zig build gopher` goes through the same
 function.
 
 **Who calls it:** this repo's `zig build gopher` (angry-gopher, with
-cobble-webbox's two modules built by hand in `build.zig`) and
+cobble-webbox's Codex Chat and UO town as its `parts`) and
 `zig build sleeper`; dog-park's
 `zig build metal` and `zig build metal-dogpark-todo`; roc-webbox's and
 observatory's `zig build metal`. Each kernel's build lives in its
@@ -290,9 +290,9 @@ embedded files, as the top module does. dog-park's `build.zig`
   binary's root, which is `probe/gopher.zig`; it forwards the
   application's `roc_hooks` declaration when the root has one
   (roc-webbox's `roc_hooks` module), and declares an empty one otherwise.
-- **gopher.elf does not use `parts`** today: its cobble-webbox modules are
-  made by hand in `build.zig`, already importing the kernel's `host_io`
-  and `webbox`.
+- **gopher.elf's parts** are cobble-webbox's two modules, built from
+  `-Dcobble-root`'s sources, their pages named by cobble-webbox's
+  `assets.zon`.
 
 Useful options: `-Ddev` builds Debug kernels, which rebuild in seconds instead
 of tens of seconds (releases are ReleaseSafe, and every run says which it
