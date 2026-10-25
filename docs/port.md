@@ -46,7 +46,8 @@ machine) it spins.
 `build.zig` compiles angry-gopher's `zig-server/src/*.zig` from its checkout
 (`-Dgopher-root`, `../angry-gopher` by default) and the webbox library's
 `src/*.zig` from zig-webbox's (`-Dwebbox-root`, `../zig-webbox`), and
-Shale's from shale's (`-Dshale-root`, `../shale`), unchanged and uncopied (Phase B step 2b, 2026-10-13). Every file that does I/O opens with
+Shale's from shale's (`-Dshale-root`, `../shale`), and cobble-webbox's
+Codex Chat and UO town from its (`-Dcobble-root`, `../cobble-webbox`), unchanged and uncopied (Phase B step 2b, 2026-10-13). Every file that does I/O opens with
 `const Io = @import("host_io").Io;`, and this build hands them
 `src/host_io_metal.zig` as `host_io`. A file that aliases std's `Io` instead
 is refused by the build's check. What the application serves besides its code

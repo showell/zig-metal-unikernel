@@ -59,9 +59,12 @@ machine only encrypted.
 
 A release is a **boot image** and a **tag**. `vN` is the next number after
 the last tag (`git -C ~/showell_repos/zig-metal-unikernel tag -l 'v*'`).
-The image compiles angry-gopher's `zig-server/src` and zig-webbox's `src`
-from their sibling checkouts, so a release names three commits, plus
-zig-coverage-sdk's, which the verdicts also key on.
+The image compiles angry-gopher's `zig-server/src`, zig-webbox's `src`,
+shale's `src` and cobble-webbox's `src` (Codex Chat and the UO town, which
+angry-gopher's router mounts with webbox's `combo.Mount`) from their sibling
+checkouts, so a release names each of their commits and this repo's, plus
+zig-coverage-sdk's, which the verdicts also key on (`tools/verdicts.py`;
+v38's tag message is the model).
 
 1. **Merge** what ships into each repo's master, and push. Then build
    angry-gopher's site files that git does not track:
@@ -75,7 +78,7 @@ zig-coverage-sdk's, which the verdicts also key on.
    and zig-webbox's, which the gates below do not run (they judge metal
    against Linux). It must pass before step 2.
 2. **The checks**, on the code as committed, detached. **Nothing in the
-   four checkouts is edited while they run**, and each attempt gets a
+   sibling checkouts is edited while they run**, and each attempt gets a
    fresh folder (the summary is appended to):
 
        D=~/build/zig-metal-unikernel/release-vN-1     # -2, -3 … for a rerun
@@ -121,6 +124,8 @@ zig-coverage-sdk's, which the verdicts also key on.
    - `curl -s -H "Authorization: Bearer $(cat ~/.gopher_api_key)" https://lynrummy.com/admin/host`
      shows this repo's commit and angry-gopher's (zig-webbox's is in the
      tag message, not on the page);
+   - each mounted application answers its page: `/codex-chat/` (and the
+     UO town's `/uo/town/` once a release carries it);
    - run the watchdog once: `ssh 162.243.1.123 python3 watchdog.py`. It
      lives in prod's home, kept current by angry-gopher's `ops/deploy`, and
      reads metal's address from `~/metal-url` there. **Right after a
@@ -129,7 +134,7 @@ zig-coverage-sdk's, which the verdicts also key on.
 6. **Tag** the released commit `vN`, annotated, in zig-metal-unikernel and
    in angry-gopher, and push the tags. The message is the release note;
    the previous tag's (`git show <previous tag> --no-patch`) is the model: the date, the image and its
-   sha256, the three commits, where the passing checks' logs are, what is
+   sha256, every checkout's commit, where the passing checks' logs are, what is
    new. **What serves is the tag**; master may be ahead of it.
 7. **Nothing in the README changes**: the tag is the record (README,
    "Where it stands").
@@ -270,7 +275,8 @@ Everything above is ours. To stand up your own lynrummy.com (Gopher Chat)
 or Dog Park:
 
 - **Fork and check out side by side:** zig-metal-unikernel, zig-webbox,
-  zig-coverage-sdk, and angry-gopher or dog-park; metal-vmm too, for tiers
+  zig-coverage-sdk, shale, and angry-gopher (with cobble-webbox, which it
+  mounts) or dog-park; metal-vmm too, for tiers
   2-3 and the long tier. Zig 0.17. The README's "What you need" lists the
   rest (QEMU, mtools, dosfstools, KVM for metal-vmm).
 - **Try it locally first:** angry-gopher's `ops/start` (Linux, :9001), or

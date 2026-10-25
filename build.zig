@@ -921,8 +921,8 @@ pub const App = struct {
     /// The application, built by its own build.zig with its own options and
     /// imports. Its root exports `site` and `hosting` (probe/gopher.zig's
     /// host contract). It names no target or optimize mode: it takes the
-    /// kernel's. It imports neither `host_io` nor `webbox`: those are this
-    /// machine's, and `addAppKernel` adds them.
+    /// kernel's. It imports neither `host_io`, `webbox` nor `shale`: those
+    /// are this machine's, and `addAppKernel` adds them.
     module: *std.Build.Module,
     /// Its assets.zon, a file in a checkout (not a generated one): read at
     /// configure time, as every build of the application reads it. Each
