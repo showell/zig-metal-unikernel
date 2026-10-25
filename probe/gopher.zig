@@ -567,8 +567,62 @@ pub fn kmain() noreturn {
         serial.put(" request(s), as " ++ config_path ++ " says\n");
     } else serial.put("  serving until stopped\n");
 
-    // ── the network ─────────────────────────────────────────────────────────
     rng.attach(&rng_mem);
+
+    // ── the application, set up before the network listens ──────────────────
+    //
+    // **SET UP, THEN LISTEN** (Steve, 2026-10-25): a client that connects
+    // waits for nothing but the loop, so its idle time is the loop's to keep
+    // (metal-vmm's timeouts.sh measures a silent client's let-go from the
+    // moment it opened).
+    var request_heap = RequestHeap.init(pages.allocator, request_heap_bytes);
+    if (!request_heap.preheat())
+        serial.fail("the machine has not enough memory for a request heap");
+    // **THE HOST CONTRACT, ONE CALL** (webbox's site.zig, the application's
+    // `app.site`): what this machine supplies (where the data is on
+    // its volumes, how its free space is read off the data's FAT, the trusted
+    // proxy, /admin/host's facts and the serial log), and the setup in its one
+    // order before the first request: the session secret's move, every chat
+    // session's last-message record (as Linux does, so the two hosts leave
+    // the same files behind, which the judge compares), and search's index.
+    // Each one-time pass reads on an arena `start` gives back. The fetch it
+    // is handed reaches the network only when a request asks, after the
+    // network is up below.
+    const started = app.site.start(io, .{
+        .roots = .{ .data_dir = data_dir, .auth_dir = auth_dir },
+        .free_space = .{ .reader = dataSpace },
+        .trusted_proxy = trusted_proxy,
+        .facts = metalFacts,
+        .log = metalLog,
+        .logs = metalLogs,
+        .say = metalSay,
+        .fetch = .{ .start = fetchStart, .result = fetchResult },
+    }) catch |e| {
+        serial.put("  ");
+        serial.put(@errorName(e));
+        serial.put("\n");
+        serial.fail("the host contract's setup (app.site.start) failed");
+    };
+    const hub = started.hub;
+    // **DURABLE ON DEMAND** (metal-vmm QUEUE 200): the script route's
+    // sequence number is flushed before its script runs, and a failed
+    // flush refuses the run.
+    webbox.store.durable_now = Io.durableChecked;
+    drains = .{ .gpa = hub.gpa, .limit = app.site.bodyLimit };
+    {
+        var said: [1024]u8 = undefined;
+        var w: std.Io.Writer = .fixed(&said);
+        app.hosting.describeStart(started.app, &w) catch
+            serial.fail("the application's start report is past its 1 KiB buffer (app.hosting.describeStart)");
+        var lines = std.mem.splitScalar(u8, std.mem.trimEnd(u8, w.buffered(), "\n"), '\n');
+        while (lines.next()) |line| {
+            serial.put("  ");
+            serial.put(line);
+            serial.put("\n");
+        }
+    }
+
+    // ── the network ─────────────────────────────────────────────────────────
     const nic_base = virtio.findNth(virtio.device_id_net, @backingInt(conf.card)) orelse switch (conf.card) {
         .public => serial.fail("no virtio-net device on the PCI bus or in any mmio slot"),
         .private => serial.fail("`card = private`, and this machine has no second network card"),
@@ -622,50 +676,6 @@ pub fn kmain() noreturn {
     serial.putDec(max_connections);
     serial.put(" connections at once, one of them kept for the machine's own fetch\n");
 
-    var request_heap = RequestHeap.init(pages.allocator, request_heap_bytes);
-    if (!request_heap.preheat())
-        serial.fail("the machine has not enough memory for a request heap");
-    // **THE HOST CONTRACT, ONE CALL** (webbox's site.zig, the application's
-    // `app.site`): what this machine supplies (where the data is on
-    // its volumes, how its free space is read off the data's FAT, the trusted
-    // proxy, /admin/host's facts and the serial log), and the setup in its one
-    // order before the first request: the session secret's move, every chat
-    // session's last-message record (as Linux does, so the two hosts leave
-    // the same files behind, which the judge compares), and search's index.
-    // Each one-time pass reads on an arena `start` gives back.
-    const started = app.site.start(io, .{
-        .roots = .{ .data_dir = data_dir, .auth_dir = auth_dir },
-        .free_space = .{ .reader = dataSpace },
-        .trusted_proxy = trusted_proxy,
-        .facts = metalFacts,
-        .log = metalLog,
-        .logs = metalLogs,
-        .say = metalSay,
-        .fetch = .{ .start = fetchStart, .result = fetchResult },
-    }) catch |e| {
-        serial.put("  ");
-        serial.put(@errorName(e));
-        serial.put("\n");
-        serial.fail("the host contract's setup (app.site.start) failed");
-    };
-    const hub = started.hub;
-    // **DURABLE ON DEMAND** (metal-vmm QUEUE 200): the script route's
-    // sequence number is flushed before its script runs, and a failed
-    // flush refuses the run.
-    webbox.store.durable_now = Io.durableChecked;
-    drains = .{ .gpa = hub.gpa, .limit = app.site.bodyLimit };
-    {
-        var said: [1024]u8 = undefined;
-        var w: std.Io.Writer = .fixed(&said);
-        app.hosting.describeStart(started.app, &w) catch
-            serial.fail("the application's start report is past its 1 KiB buffer (app.hosting.describeStart)");
-        var lines = std.mem.splitScalar(u8, std.mem.trimEnd(u8, w.buffered(), "\n"), '\n');
-        while (lines.next()) |line| {
-            serial.put("  ");
-            serial.put(line);
-            serial.put("\n");
-        }
-    }
     // **IDLE TIME** (src/idle.zig, essay idle-time-on-metal): each volume's
     // check, asked again while the machine serves, a slice per quiet moment.
     for ([_]?*disk_fat.Volume{ Io.siteVolume(), Io.dataVolume() }, 0..) |maybe, k| {
