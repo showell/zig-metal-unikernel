@@ -9,9 +9,10 @@ So:
   of every file a kernel reads from their checkouts (`served_files`):
   angry-gopher's server source, the assets its build.zig embeds, pages/ and
   gallery/; and zig-webbox's. Dog Park is not judged here (Steve,
-  2026-10-13: an application is not this repo's test of itself). A verdict is keyed by that and by this repo's
-  and the SDK's commits (B16), so a README commit in either leaves a verdict
-  standing and an SDK change does not.
+  2026-10-13: an application is not this repo's test of itself). A verdict is keyed by that, by this repo's
+  and the SDK's commits (B16), and by the compiler's `zig version`, so a
+  README commit in either leaves a verdict standing and an SDK or compiler
+  change does not.
 - `gates.sh` and `long.sh` call `pair`, which prints the two they are about
   to judge, or refuses a checkout the build cannot take (`freshness`).
   At the end they call `record`, which keeps their verdict for that pair.
@@ -152,9 +153,17 @@ def content_id() -> str:
     return "content-" + h.hexdigest()[:16]
 
 
+def compiler_id() -> str:
+    """`zig version` of the `zig` on PATH, which every build here runs: a
+    patched release names its patches (0.17.0+patched.2), so a verdict from
+    another compiler does not carry over to this one."""
+    return subprocess.run(["zig", "version"], check=True, capture_output=True, text=True).stdout.strip()
+
+
 def ours_id() -> str:
-    """This repo's commit, and the SDK's it builds against (by path)."""
-    return commit_of(ROOT) + ".sdk-" + commit_of(SDK)
+    """This repo's commit, the SDK's it builds against (by path), and the
+    compiler."""
+    return commit_of(ROOT) + ".sdk-" + commit_of(SDK) + ".zig-" + compiler_id()
 
 
 def current_pair() -> tuple:
@@ -169,6 +178,9 @@ def current_pair() -> tuple:
 
 
 def short(c: str) -> str:
+    if ".zig-" in c:
+        a, b = c.split(".zig-", 1)
+        return short(a) + ", Zig " + b
     if ".sdk-" in c:
         a, b = c.split(".sdk-", 1)
         return short(a) + " with the SDK at " + short(b)
@@ -229,7 +241,7 @@ def require() -> list:
     if problem:
         return [problem]
     why = []
-    here, sdk = ours.split(".sdk-", 1)
+    here, sdk = ours.split(".zig-", 1)[0].split(".sdk-", 1)
     if here.endswith("-dirty"):
         why.append("zig-metal-unikernel has uncommitted changes")
     if sdk.endswith("-dirty"):
