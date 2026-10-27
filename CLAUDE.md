@@ -3,11 +3,9 @@
 The README is the orientation. Work happens on the dev box, with Steve.
 
 If you are a Claude Code **cloud** session ("CC"): you work here on the
-**simulators and properties only**, plus **the Store** (old QUEUE.md
-items 76-81: its interface, model, FAT and
-strict Linux implementations, and `store_sim`, all new files, none of them
-in the image). Your charter, the
-branch map and the one shared queue live in metal-vmm, not here: read
+**simulators and properties only**, plus **the Store** (its interface, model, FAT and strict Linux
+implementations, and `store_sim`, none of them in the image). Your charter,
+the branch map and the one shared queue live in metal-vmm, not here: read
 metal-vmm's `CLOUD_WORK.md` ("zig-metal-unikernel: the simulators") and its
 `QUEUE.md` on `master` (github.com/showell/metal-vmm). Branch from
 `master`, push only `claude/*` branches, and never push to `master` or a

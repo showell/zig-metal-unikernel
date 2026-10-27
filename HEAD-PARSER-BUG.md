@@ -1,6 +1,8 @@
 # zig's `std.http.HeadParser` and a bare-LF head end
 
-Found by `probe/fuzz_requests.py` (QUEUE.md item 81), with zig 0.16.0.
+A bug in Zig's standard library, still there in Zig 0.17.0. `src/ready.zig`
+pins it in a test that fails once an upgraded Zig fixes it; then this page
+and `probe/fuzz_requests.py`'s allowance for it go.
 
 ## What happens
 
@@ -10,15 +12,11 @@ the bytes are split between calls.**
 - Fed in pieces under 32 bytes, it finds every one.
 - Fed in larger pieces, it uses a vector path. When a vector holds exactly
   two (or three) CR/LF bytes, it checks only the vector's last two (or three)
-  bytes. Two wrong answers follow, both seen here:
+  bytes. Two wrong answers follow:
   - a `\n\n` elsewhere in that vector is missed, and parsing runs on to a
-    later end (the request the fuzzer found: the end at 169 bytes when fed
-    a byte at a time, at 204 when fed whole);
+    later end (`src/ready.zig`'s test);
   - a `\n\n` that is found is reported short of its end (the reproducer
-    below: 134 a byte at a time, 132 whole).
-
-The same bytes can therefore have one head or another, by how they were
-read.
+    below).
 
 ## Here
 
@@ -29,16 +27,15 @@ two hosts can answer such a request differently:
 
 **Real traffic never meets it.** Caddy, in front of both hosts, sends CRLF,
 and metal is reachable only on the private network. So nothing in either
-host works around it. `src/ready.zig` pins today's behaviour in a test that
-fails when an upgraded zig fixes it. The fuzzer counts such cases apart, not
-as differences.
+host works around it. `probe/fuzz_requests.py` and `src/ready_sim.zig`
+count such cases apart, not as differences.
 
 ## For an upstream report
 
 ```zig
 const std = @import("std");
 test "HeadParser finds a bare-LF end whatever the read size" {
-    const req = "GET /" ++ "x/" ** 50 ++ " \nHost: a\nContent-Length: 1\n\n" ++
+    const req = "GET /x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/x/ \nHost: a\nContent-Length: 1\n\n" ++
         "\xffGET / HTTP/1.1\r\nHost: x\r\n\r\n";
     var a: std.http.HeadParser = .{};
     var at: usize = 0;

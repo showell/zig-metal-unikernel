@@ -1,7 +1,7 @@
 # /admin/host and /admin/log, for agents
 
-How an agent finds out what the running server is doing (metal-vmm QUEUE
-189). There are two views, behind one key:
+How an agent finds out what the running server is doing. There are two views,
+behind one key:
 
 - **`/admin/host`**: the page for Steve, in HTML. A health summary, then
   the details, then the log's newest 60 lines.
@@ -149,11 +149,11 @@ From the top:
      far more often than frames arrive is a device interrupting with
      nothing to say: an interrupt storm, which looks like a busy
      processor otherwise. Each is read off the interrupt's own handler.
-   - **Sleeps** (only from the release that has the sleep:
-     `git tag --contains 42bb498`): the rests of a machine with nothing in motion, which
-     last until the application's next wake or `longest_rest_ms` (10 s)
-     (docs/designs/DESIGN-sleep.md): how many, how many the card ended,
-     how many ran the whole longest rest, how many neither ended, and
+   - **Sleeps** (releases from v33): the rests of a machine with nothing
+     in motion, which last until the application's next wake or
+     `longest_rest_ms` (10 s) (docs/designs/DESIGN-sleep.md): how many,
+     how many the card ended, how many ran the whole longest rest, how
+     many neither ended, and
      **missed wakes**: a sleep the timer ended after which a frame was
      waiting, one whose interrupt never came. Any missed wake is worth a
      look: it is a request that waited up to the longest rest.
@@ -198,7 +198,7 @@ From the top:
        the disk asked for a reset. Nothing more is sent to it: every read
        and write after that fails, counted, and the requests that needed
        it are answered with an error. Only a restart brings it back, and
-       **the machine restarts itself** at the next turn (198.3), so you
+       **the machine restarts itself** at the next turn, so you
        will rarely see this row say it: you see the next boot's
        "restarted" row instead;
      - **what its failed requests ended with**: "none", or each kind with
@@ -269,8 +269,8 @@ admin '/admin/log?boot=this' | grep -m3 'restart'
 ```
 
 The boot before's log ends with its reason (`RESTART: ...`). This boot's
-own line says which boot it is and what the boot before ended on. The boot
-before's log is kept only by a kernel built with the restart (`-Drestart`).
+own line says which boot it is and what the boot before ended on. A kernel
+built with `-Drestart=false` keeps no boot before.
 `# the boot before: none kept` means a first boot, or one that did not end
 on purpose: a hang, a power cut, or an external reset.
 

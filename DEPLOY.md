@@ -3,8 +3,7 @@
 How we run our two sites from the dev box: the machines, where the secrets
 live, a release step by step, the way back, Shale scripts, prod's Caddy,
 backups, and the dev box's own servers. This is the operator's doc, specific to our
-setup; the README says what the kernel is. [`CUTOVER.md`](CUTOVER.md) is
-the record of the 2026-10-04 move from Linux; dog-park's
+setup; the README says what the kernel is. dog-park's
 [`DEPLOY.md`](https://github.com/showell/dog-park/blob/main/DEPLOY.md) is
 Dog Park's own. **Running your own copies?** Start at the last section.
 
@@ -63,8 +62,7 @@ The image compiles angry-gopher's `zig-server/src`, zig-webbox's `src`,
 shale's `src` and cobble-webbox's `src` (Codex Chat and the UO town, which
 angry-gopher's router mounts with webbox's `combo.Mount`) from their sibling
 checkouts, so a release names each of their commits and this repo's, plus
-zig-coverage-sdk's, which the verdicts also key on (`tools/verdicts.py`;
-v38's tag message is the model).
+zig-coverage-sdk's, which the verdicts also key on (`tools/verdicts.py`).
 
 1. **Merge** what ships into each repo's master, and push. Then build
    angry-gopher's site files that git does not track:
@@ -95,7 +93,9 @@ v38's tag message is the model).
 3. **The image**, once both pass. `droplet/chat.py` builds gopher.elf
    itself from this tree, and **refuses unless both verdicts passed for
    exactly this code** and the trees are clean. It also refuses without
-   `droplet/trusted-proxy`.
+   `droplet/trusted-proxy`, prod's private address: without it every request
+   through Caddy is one client address, and per-address limits bind the
+   whole site.
 
        mkdir -p ~/build/zig-metal-unikernel/droplet-image && cd ~/build/zig-metal-unikernel/droplet-image
        ~/showell_repos/zig-metal-unikernel/droplet/chat.py vN.img
@@ -116,7 +116,7 @@ v38's tag message is the model).
      Distribution **Unknown**, region **nyc2**, name `vN`;
    - on the **`gopher-metal`** droplet (check the name: the chat image on
      `dogpark` wipes Dog Park's disk, and the kernel then refuses to serve
-     with "no volume attached"; the 2026-10-16 fire drill), Destroy →
+     with "no volume attached"), Destroy →
      **Restore base image** from `vN`. The volume stays attached and
      untouched.
 5. **Check it serves:**
@@ -124,8 +124,8 @@ v38's tag message is the model).
    - `curl -s -H "Authorization: Bearer $(cat ~/.gopher_api_key)" https://lynrummy.com/admin/host`
      shows this repo's commit and angry-gopher's (zig-webbox's is in the
      tag message, not on the page);
-   - each mounted application answers its page: `/codex-chat/` (and the
-     UO town's `/uo/town/` once a release carries it);
+   - each mounted application answers its page: `/codex-chat/` and
+     `/uo/town/`;
    - run the watchdog once: `ssh 162.243.1.123 python3 watchdog.py`. It
      lives in prod's home, kept current by angry-gopher's `ops/deploy`, and
      reads metal's address from `~/metal-url` there. **Right after a
@@ -146,8 +146,38 @@ v38's tag message is the model).
 **Restore the droplet's base image from the previous release** (Custom
 Images keeps every imported one). The data is on the volume, which a rebuild does not touch;
 step 4's snapshot covers a release that wrote something bad.
-`CUTOVER.md`'s Linux restart is the last resort only: its data is frozen
-at the 2026-10-04 cutover, so every write since would be lost.
+
+**Prod's Linux server is the last resort only.** It is stopped, with its
+`data/` and `auth/` frozen as they were when metal took over on
+2026-10-04, so every write since is lost unless it is carried across.
+**Never start it while metal serves:** two hosts writing two copies of the
+same data cannot be merged. angry-gopher's `ops/deploy` and the watchdog
+treat Linux as serving only while `~/linux-serves` exists on prod
+(angry-gopher's `deploy/README.md`). If it must serve again:
+1. **Freeze metal:** point Caddy at a maintenance page, or at nothing, so
+   no more writes land.
+2. **Take the data off it**, either way:
+   - a backup (below), and only once `droplet/check_backup.py` says it is
+     whole, `tar xf <backup>.tar -C back/` (tar keeps the modification
+     times);
+   - or the whole volume: from the recovery console, `dd if=/dev/sdX1` to
+     a file, fetched to the dev box, then `droplet/extract_volume.py
+     volume.img back/`, which writes every name in its stored case, every
+     byte and time, and checks the result against the volume.
+3. **Put it on prod beside the frozen trees:** copy `back/` (holding
+   `data/` and `auth/`) to `~/AngryGopher/back`. Keep a copy of
+   `~/AngryGopher/gopher.conf` as it is, then set in it `data_dir =
+   /home/steve/AngryGopher/back/data` and `auth_dir =
+   /home/steve/AngryGopher/back/auth`. Then `touch ~/linux-serves` and
+   `sudo systemctl start gopher-server`.
+4. **Compare before switching:** on the backup path metal still serves, so
+   `droplet/compare_hosts.py back http://127.0.0.1:9001 http://10.100.0.4`
+   (run on prod) must end `0 different`; on the volume path,
+   `extract_volume.py`'s own check is the comparison, and the writes made
+   on metal must show on prod.
+5. **Point Caddy back at prod's own server** (`localhost:9001`, angry-gopher's
+   `deploy/Caddyfile`) and reload it. `/admin/host` then says `Linux,
+   zig-server`.
 
 ## Backups
 
@@ -179,9 +209,10 @@ and keep the backups off the droplet. A leaked one: `SECRET-LEAK.md`.
 
 **Restoring.** A snapshot: restore the volume in the console, then check
 `/admin/host`'s disk report. A tar: decrypt it (`age -d`), check it whole,
-unpack it, and build a volume image from the tree with
-`droplet/build_volume.py <tree> <out.img> --fat 32 --gib 16`, as the
-cutover did (`MIGRATION.md`). The new volume has a new FAT serial, so
+unpack it, check the tree with `droplet/check_volume_tree.py <tree> --fat
+32 --gib 16` (what a FAT volume cannot hold: [`FAT32.md`](FAT32.md)), and
+build a volume image from it with
+`droplet/build_volume.py <tree> <out.img> --fat 32 --gib 16`. The new volume has a new FAT serial, so
 `droplet/volume-serial` and the boot image change too. Restoring a tar onto
 metal has not been run end to end.
 
@@ -240,15 +271,14 @@ On prod they are installed under `/etc/caddy/`, with the site blocks in
 
 `ops/knocks` (angry-gopher, run on the dev box) reads prod's access logs
 and sshd: scanners are weather; a login from a stranger is an event.
-Prod's Linux server is stopped and stays stopped.
 
 ## Dog Park
 
 dog-park's [`DEPLOY.md`](https://github.com/showell/dog-park/blob/main/DEPLOY.md)
 has the first deploy and "A new release". In short: `zig build metal-gate`
 last, then `droplet/image.mjs`, then the owner rebuilds the `dogpark`
-droplet (Destroy → Restore base image). It has **one disk: a release starts every game over** (decided;
-persistence waits until it is earned).
+droplet (Destroy → Restore base image). It has **one disk: a release starts every game over**
+(persistence waits until it is earned).
 
 ## The dev box's own servers
 

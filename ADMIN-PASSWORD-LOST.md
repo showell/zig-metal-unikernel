@@ -1,7 +1,6 @@
 # If the admin password is lost
 
-Old QUEUE.md item 89, found by fire drill 1. One page, for the day it is
-needed. Releases are DEPLOY.md.
+One page, for the day it is needed. Releases are DEPLOY.md.
 
 ## What is locked
 
@@ -60,10 +59,6 @@ from a backup, or the volume, as any file of it.
 
 ## Tested
 
-- **angry-gopher:** `ops/test_reset_admin_password`, against a real
-  server.
-- **zig-metal-unikernel:**
-  - `src/io_test.zig`: once; another name; no admin; a reset stopped
-    part-way and finished by the next boot;
-  - the judge's `admin-reset` gate, on both hosts
-    (`probe/run.sh gopher admin-reset`).
+angry-gopher's `ops/test_reset_admin_password`, against a real server;
+here, `src/io_test.zig`'s reset tests and the judge's `admin-reset` gate on
+both hosts (`probe/run.sh gopher admin-reset`).

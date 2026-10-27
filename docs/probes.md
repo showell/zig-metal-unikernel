@@ -84,8 +84,8 @@ PASS fetch | every case passed
 a name it does not know is an error that lists them all (the judge's `GATES`
 in `probe/judge_gopher.py`), not a silently complete run. The single requests
 go to one boot by default; `probe/run.sh gopher isolated` gives each its own
-boot, which proves an answer owes nothing to an earlier one. Neither gate
-script runs `isolated`; it is there to ask by hand.
+boot, which proves an answer owes nothing to an earlier one. No tier script
+runs `isolated`; `probe/long_run.sh` does.
 
 **Two builds.** `-Ddev` builds the kernels in Debug — a rebuild of the real
 server in seconds instead of ReleaseSafe's tens — and `run.sh quick` builds
