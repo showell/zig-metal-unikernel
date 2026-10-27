@@ -42,8 +42,7 @@ fn here() std.builtin.SourceLocation {
     return @src();
 }
 
-/// **THE REQUEST LOG WRITES THE PATH, NEVER THE QUERY** (QUEUE.md item 95,
-/// REVIEW-secrets.md finding 1). The redactor below takes a secret VALUE out of
+/// **THE REQUEST LOG WRITES THE PATH, NEVER THE QUERY.** The redactor below takes a secret VALUE out of
 /// a query by its key; this takes the whole query off the request target before
 /// it is ever logged, so a future query-borne token under a key the redactor
 /// does not know never reaches the ring `/admin/host` serves or `kept_log`. The

@@ -289,7 +289,7 @@ MEMBER_STORY = [
     step("the host's log, a filter spelled wrong", "GET", "/admin/log?since=yesterday", JAR),
     step("logging out", "POST", "/logout", JAR, "release=no"),
     step("chat, after logging out", "GET", "/chat", JAR),
-    # **ONLY THE ADMIN** (REVIEW-admin-host.md finding 2): the gate that
+    # **ONLY THE ADMIN**: the gate that
     # refuses /admin refuses this too, today because it is the same gate. These
     # ask /admin/host itself, so a dispatch that served it before the gate
     # fails. They come after logging out, so that nothing they set reaches a
@@ -314,7 +314,7 @@ MEMBER_STORY = [
 ]
 
 
-# **GOPHER_UID, SIGNED** (QUEUE.md item 51, DESIGN-signed-uid.md). The cookie
+# **GOPHER_UID, SIGNED** (angry-gopher's uid_cookie.zig). The cookie
 # that names a player was set in the clear, so whoever set it by hand was that
 # player, or that guest. Now it is signed, and an unsigned one from before is
 # re-signed once, on its owner's first GET, inside a window. The forged
@@ -517,7 +517,7 @@ def partition_last(image: str) -> int:
 # FAT32 volume now, so FAT32 is what the gate runs every time; `FAT=16` is the
 # extra run, which gates.sh takes only when src/fat16*, src/io*, the judge or
 # chat.py changed. build_disk formats FAT32 at 512-byte clusters, about
-# 126,000 of them in 64 MiB (item 17, FAT32.md "Then the chat judge"). The
+# 126,000 of them in 64 MiB. The
 # site's own disk on the droplet machine stays FAT16 either way.
 FAT_KIND = os.environ.get("FAT", "32")
 
@@ -1508,8 +1508,8 @@ def host_page_differences(metal: bytes, linux: bytes, image: str = None, boot_di
     account of itself. So what is compared is its shape: both have the
     application's half, with the same rows, and each says which host it is.
 
-    **AND WHAT METAL SAYS ABOUT ITS DISK IS CHECKED** (REVIEW-admin-host.md
-    finding 1), because the page is where an operator learns the volume is
+    **AND WHAT METAL SAYS ABOUT ITS DISK IS CHECKED**, because the page is
+    where an operator learns the volume is
     filling:
       - the host's report must not have failed (its one row then names the
         error), and no volume's free space may be "unreadable";

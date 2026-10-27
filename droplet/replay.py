@@ -7,7 +7,7 @@ access log, asked again of two hosts serving the same data, and compared.
 
 `LOG` is Caddy's access log, one JSON object a line (`log { format json }`;
 `format` is JSON by default). **PROD WRITES NONE TODAY:** its Caddyfile has
-no `log` directive (REVIEW-admin-backup.md), so one has to be added there
+no `log` directive, so one has to be added there
 before there is anything to replay.
 
 **KEPT:** a request whose `request.method` is GET and whose

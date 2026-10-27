@@ -25,8 +25,7 @@ const gopher = @import("gopher.zig");
 /// cap is 10 MiB), so a picture read once is served from memory rather than read
 /// whole from the disk on every GET — the one stall item 90 left (30-39 MB/s).
 /// A file past the cap is read from the disk as before, so no single big upload
-/// pushes the transcripts out. `docs/designs/DESIGN-picture-cache.md` has the
-/// method and the budget cost.
+/// pushes the transcripts out. The cache is `src/page_cache.zig`.
 const page_cache_largest_kib_default = app.hosting.whole_read_max >> 10;
 
 pub const config_path = "zig-metal-unikernel.conf";

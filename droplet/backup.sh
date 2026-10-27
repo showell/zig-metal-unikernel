@@ -1,7 +1,7 @@
 #!/bin/bash
-# **A BACKUP OF METAL, BY HAND, ON PROD** (QUEUE.md item 98; CUTOVER.md's
-# "Backups, after the cutover"). Run on <prod>, over the private network, where
-# metal answers nothing else while it streams (REVIEW-admin-backup.md finding 3):
+# **A BACKUP OF METAL, BY HAND, ON PROD** (DEPLOY.md, "Backups"). Run on
+# <prod>, over the private network, where metal answers nothing else while it
+# streams:
 #
 #   droplet/backup.sh HOST [DIR]
 #

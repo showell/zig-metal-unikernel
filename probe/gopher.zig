@@ -785,7 +785,7 @@ pub fn kmain() noreturn {
         // request may have started it, and a steady run of requests never
         // starves it.
         betweenSlice(io);
-        // **LOUD, ONCE PER OCCURRENCE** (REVIEW-item90-step2.md finding 1): a
+        // **LOUD, ONCE PER OCCURRENCE**: a
         // frame too long to send is a kernel bug net.zig refused rather than
         // overrun. The count is on /admin/host; this is the console line.
         if (nic.oversized != oversized_seen) {
