@@ -45,5 +45,9 @@ for one in memory:512 memory:2048 memory:4096 clock:2048 block:2048 net:2048 rng
     else
         echo "FAIL $probe  $memory MB, exit $code:"; sed 's/^/    /' "$WORK/out.txt"; failed=1
     fi
+    # **ONE BOOT'S SCRATCH AT A TIME**: DIRTY=1's RAM file is the machine's
+    # whole memory, so leaving each to the EXIT trap held 10 GB at once by
+    # `net`, and a box with less free failed `net` and `rng` with no output.
+    rm -f "$img" "$img.ram" "$img.config"
 done
 exit $failed
