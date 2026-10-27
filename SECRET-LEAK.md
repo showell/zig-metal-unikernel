@@ -1,14 +1,11 @@
 # If the session secret leaks
 
-Old QUEUE.md item 66. One page, for the day it is needed. How a backup is
-taken safely is DEPLOY.md, "Backups"; the options
-behind this page are in docs/designs/DESIGN-sessions.md. It holds whatever is decided
-about session lifetimes.
+One page, for the day it is needed. How a backup is taken safely is
+DEPLOY.md, "Backups".
 
 ## What the secret is, and what a leak gives away
 
-`auth/_session_secret` (it moved there from `data/chat/` in QUEUE item 106, so
-`auth/` holds every secret and `data/` none) signs both cookies the site sets:
+`auth/_session_secret` signs both cookies the site sets:
 - **every member's session** (`gopher_auth`);
 - **every player's identity** (`gopher_uid`).
 Whoever has it can make either for anyone, offline, for as long as it
@@ -55,7 +52,7 @@ script cannot be run.
   - take a new one;
   - delete every older one you can reach: they hold the old secret, and
     the old hashes and keys;
-  - keep the new one encrypted (docs/reviews/REVIEW-admin-backup.md, finding 6).
+  - keep the new one encrypted.
 
 **4. Tell the members** they will have to log in again, and why.
 
@@ -68,15 +65,11 @@ script cannot be run.
   `_session_secret.previous` until its date, and is no longer used after
   that.
 
-## How this was tested
+## Testing it
 
-`droplet/rotate_secret.py --self-test` runs the procedure on the judge's
-staged site, on a Linux server and on metal booted under QEMU. On each:
-- the secret changed;
-- the old session ended;
-- the password logged in again;
-- a player's cookie signed before the change was renewed with the new
-  secret, and named the player.
-angry-gopher's router tests also check that a wrong password, or days
-that are not 0 to 90, change nothing, and that an old player cookie
-names no one once its date has passed.
+`droplet/rotate_secret.py --self-test <zig-server binary>` runs the
+procedure on the judge's staged site, on a Linux server and on metal under
+QEMU: the secret changes, the old session ends, the password logs in again,
+and a player's cookie signed before the change is renewed with the new
+secret and names the player. angry-gopher's router tests check that a
+wrong password, or days that are not 0 to 90, change nothing.

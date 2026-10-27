@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Is a backup whole? (QUEUE.md item 57, REVIEW-admin-backup.md finding 2.)
+"""Is a backup whole? A tar cut short still lists cleanly (DEPLOY.md, "Backups").
 
     droplet/check_backup.py ARCHIVE
     droplet/check_backup.py --self-test ZIG_SERVER_BINARY

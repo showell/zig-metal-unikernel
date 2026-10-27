@@ -1,12 +1,9 @@
 # The host: what Linux and metal both promise the application
 
-*The contract between an application's route table and the host it runs
-on, Linux or metal; beside STORE.md, which is the data's part of it.
-Essay: [the other doors](https://github.com/showell/essay-repl-server/blob/master/notes/the-other-doors.md). Steve's decisions are
-marked.*
+The contract between an application's route table and the host it runs
+on, Linux or metal; STORE.md is the data's part of it.
 
-**The aim is that Linux and metal agree** (Steve: no second tenant is in
-view). Every rule here exists so that something which works on a laptop
+**The aim is that Linux and metal agree.** Every rule here exists so that something which works on a laptop
 works the same on the droplet, and something that would fail on the droplet
 fails on the laptop first.
 
@@ -36,7 +33,7 @@ angry-gopher's `server.zig` calls with its names and settings), with
 4. Between handlers, `between`, when the application's wake says so
    (below, "Between handlers, and the host's fetch").
 
-## One handler at a time *(Steve, 2026-10-07)*
+## One handler at a time
 
 **A handler runs to its end with no other handler interleaved, on both
 hosts.** What runs around the handlers differs:
@@ -93,10 +90,10 @@ tries again.
   filesystem under each of the data and auth roots (the working directory's,
   in a run with no roots), so more than the request wrote, and twice over
   when both roots share a filesystem. Two senders at once may both sync.
-  Failed syncs are counted (`Durable.failures`), but no admin page shows the
-  count yet: the log line is the only sign.
+  Failed syncs are counted (`Durable.failures`), and `/admin/host` shows
+  the count as "data syncs failed".
 
-## Limits: one source of truth *(Steve, 2026-10-07)*
+## Limits: one source of truth
 
 **Each limit is defined once**, and every other place either reads it or is
 checked against it. The application's caps are angry-gopher's
@@ -109,7 +106,7 @@ are the FAT driver's, which the library restates:
 | a request's head (16 KiB) | webbox's `http.zig` (`head_bytes`), named by `limits.zig` | both hosts size their head buffers from it (`webbox.http.head_bytes`); metal asserts at compile time that a connection's receive buffer holds one |
 | an ordinary body, per route | `limits.zig` | every route's `http.readLimitedBody`; Caddy's `request_body`, held to it by `tools/check_caddy_limits.py` in `ops/check_zig` |
 | an upload (10 MiB images, 100 MiB video) | `limits.zig` (`upload_image`, `upload_video`) | `chat_upload.zig`'s kinds; Caddy, by the same script |
-| a name, a path, a depth (96, 256, 16) | metal's `disk_fat_dirent.zig`, `io.zig` and `disk_fat.zig` | zig-webbox's `store.zig` restates them for every host; `tools/check_limits.py` holds the two together, first in `gates.sh` |
+| a name, a path, a depth (96, 256, 16) | metal's `disk_fat_dirent.zig`, `io.zig` and `disk_fat.zig` | zig-webbox's `store.zig` restates them for every host; `tools/check_limits.py` holds the two together, in tier 3 |
 
 The Caddy check fails if Caddy's caps are below the application's (a request
 the app allows would be refused at the door) or far above them (harmless,
@@ -152,8 +149,7 @@ resumes.
 A value by name, typed when read.
 
 - **Metal** (`probe/gopher.zig`, `readConfig`): a malformed value stops the
-  boot; **so does a file that exists but can't be read** (Steve, 2026-10-07:
-  halting is right; B21). A missing file is the defaults.
+  boot; **so does a file that exists but can't be read**. A missing file is the defaults.
 - **Linux** (zig-webbox `linux_config.zig`, `linux_host.zig`): the file
   names only the data and auth roots, and the rest are environment
   variables. No file named is the defaults; a file named that is missing or
@@ -161,7 +157,7 @@ A value by name, typed when read.
   line with no `=`, and a key other than the two, are skipped, and a port
   that is not a port is the default port.
 
-## Idle time *(Steve, 2026-10-10; metal only, for now)*
+## Idle time (metal only)
 
 **Work that is not time-critical runs when the machine is quiet**, a step at
 a time, under a request's rules: a step is bounded (200 ms), and a request
@@ -213,6 +209,4 @@ the machine's own network only, in a connection slot kept for it
 `linux_fetch.zig`. A host with no fetch passes none, and `start` answers
 `NoFetch`.
 
-**Which release has them:** `git tag --contains 42bb498` (the sleep) and
-`git tag --contains d2b9359` (metal's fetch); empty means `master` only.
-No served application fetches yet.
+Both are served; no served application fetches yet.

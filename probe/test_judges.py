@@ -263,7 +263,7 @@ class Differences(unittest.TestCase):
     def test_the_host_page_is_compared_by_shape(self):
         app = b"<h2>The application</h2><table><tr><td>version</td><td>0.1</td></tr></table><h2>The host</h2>"
         # A whole volume row, as metalFacts writes one: the judge now reads
-        # the free-space figure (REVIEW-admin-host.md finding 1).
+        # the free-space figure.
         m = app + (b"<tr><td>host</td><td>zig-metal-unikernel, with no operating system</td></tr>"
                    b"<tr><td>the boot disk (the site)</td><td>FAT16, serial 92DE-8831: 30 MB free of 62 MB</td></tr>"
                    + self.METAL_LOG)

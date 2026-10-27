@@ -169,8 +169,8 @@ pub const Net = struct {
     /// caller's bytes are free at once. Waits only when every transmit buffer
     /// is still the device's.
     pub fn send(self: *Net, frame: []const u8) void {
-        // **A FRAME TOO LONG IS REFUSED, NOT TRUNCATED, NEVER OVERRUN**
-        // (REVIEW-item90-step2.md finding 1). The copy below would otherwise
+        // **A FRAME TOO LONG IS REFUSED, NOT TRUNCATED, NEVER OVERRUN.**
+        // The copy below would otherwise
         // run off `tx_bufs[id]` into the next frame's buffer — one connection's
         // bytes in another's. It cannot happen as the tree stands (the MSS cap),
         // so this is defence in depth: net.zig enforces its own buffer, loudly
