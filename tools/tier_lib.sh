@@ -14,7 +14,8 @@ t=$SECONDS
 lap() { echo "time: $1 $((SECONDS - t)) s"; t=$SECONDS; }
 
 # **THE SIBLINGS ARE BESIDE THIS CHECKOUT** unless named (GOPHER_ROOT,
-# WEBBOX_ROOT, SHALE_CHECKOUT, COBBLE_ROOT, METAL_VMM): ../<name>, as build.zig's own
+# WEBBOX_ROOT, SHALE_CHECKOUT, COBBLE_ROOT, CHAT_MARKDOWN_ROOT, CHAT_CLIENT_ROOT,
+# METAL_VMM): ../<name>, as build.zig's own
 # defaults and every script's (README, "What you need"): on the box that is
 # ~/showell_repos/<name>, and in check-cc.sh's
 # worktrees is the worktree's sibling. Only tiers 2 and 3 read them.
@@ -25,9 +26,11 @@ WEBBOX_ROOT="${WEBBOX_ROOT:-$(sibling zig-webbox)}"
 # shale run under a tier would then take (tier 3's doc check found no repos).
 SHALE_CHECKOUT="${SHALE_CHECKOUT:-$(sibling shale)}"
 COBBLE_ROOT="${COBBLE_ROOT:-$(sibling cobble-webbox)}"
+CHAT_MARKDOWN_ROOT="${CHAT_MARKDOWN_ROOT:-$(sibling chat-markdown)}"
+CHAT_CLIENT_ROOT="${CHAT_CLIENT_ROOT:-$(sibling chat-client)}"
 VMM="${METAL_VMM:-$(sibling metal-vmm)}"
-export GOPHER_ROOT WEBBOX_ROOT SHALE_CHECKOUT COBBLE_ROOT
-ZIG_SIBLINGS=(-Dgopher-root="$GOPHER_ROOT" -Dwebbox-root="$WEBBOX_ROOT" -Dshale-root="$SHALE_CHECKOUT" -Dcobble-root="$COBBLE_ROOT")
+export GOPHER_ROOT WEBBOX_ROOT SHALE_CHECKOUT COBBLE_ROOT CHAT_MARKDOWN_ROOT CHAT_CLIENT_ROOT
+ZIG_SIBLINGS=(-Dgopher-root="$GOPHER_ROOT" -Dwebbox-root="$WEBBOX_ROOT" -Dshale-root="$SHALE_CHECKOUT" -Dcobble-root="$COBBLE_ROOT" -Dchat-markdown-root="$CHAT_MARKDOWN_ROOT" -Dchat-client-root="$CHAT_CLIENT_ROOT")
 # Kept results, as gates.sh always kept them.
 VERDICTS="${GATES_VERDICTS:-$HOME/build/zig-metal-unikernel/gates}"
 mkdir -p "$VERDICTS"

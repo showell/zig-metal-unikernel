@@ -61,6 +61,15 @@ SHALE_BUILT = WEBBOX_BUILT
 COBBLE_ROOT = os.path.realpath(os.environ.get("COBBLE_ROOT", os.path.join(ROOT, "..", "cobble-webbox")))
 COBBLE_SRC = os.path.join(COBBLE_ROOT, "src")
 COBBLE_BUILT = ("src", "assets.zon", "web/chat.html", "web/uo-town.html")
+# The chat's markdown (chat-markdown) and its browser client (chat-client),
+# which angry-gopher's kernel compiles and embeds.
+MARKDOWN_ROOT = os.path.realpath(os.environ.get("CHAT_MARKDOWN_ROOT", os.path.join(ROOT, "..", "chat-markdown")))
+MARKDOWN_BUILT = ("src", "build.zig", "build.zig.zon")
+CLIENT_ROOT = os.path.realpath(os.environ.get("CHAT_CLIENT_ROOT", os.path.join(ROOT, "..", "chat-client")))
+CLIENT_BUILT = ("js", "build.zig", "build.zig.zon")
+# Each library checkout: its name, root and the paths a build reads.
+CHAT_LIBRARIES = (("chat-markdown", MARKDOWN_ROOT, MARKDOWN_BUILT),
+                  ("chat-client", CLIENT_ROOT, CLIENT_BUILT))
 VERDICT_DIR = os.environ.get("GATES_VERDICT_DIR", os.path.expanduser("~/build/zig-metal-unikernel/verdicts"))
 SDK = os.environ.get("COVERAGE_SDK", os.path.join(os.path.dirname(ROOT), "zig-coverage-sdk"))
 TIERS = ("gates", "long")
@@ -142,7 +151,8 @@ def content_id() -> str:
     for repo, root, rels in (("angry-gopher", GOPHER_ROOT, served_files()),
                              ("zig-webbox", WEBBOX_ROOT, sorted(walk(WEBBOX_ROOT, WEBBOX_BUILT))),
                              ("shale", SHALE_CHECKOUT, sorted(walk(SHALE_CHECKOUT, SHALE_BUILT))),
-                             ("cobble-webbox", COBBLE_ROOT, sorted(walk(COBBLE_ROOT, COBBLE_BUILT)))):
+                             ("cobble-webbox", COBBLE_ROOT, sorted(walk(COBBLE_ROOT, COBBLE_BUILT))),
+                             *((name, root, sorted(walk(root, built))) for name, root, built in CHAT_LIBRARIES)):
         for rel in rels:
             h.update(f"{repo}/{rel}".encode() + b"\0")
             try:
@@ -257,6 +267,9 @@ def require() -> list:
         why.append("shale has uncommitted changes")
     if git(COBBLE_ROOT, "status", "--porcelain", "--untracked-files=no", "--", *COBBLE_BUILT):
         why.append("cobble-webbox has uncommitted changes")
+    for name, root, built in CHAT_LIBRARIES:
+        if git(root, "status", "--porcelain", "--untracked-files=no", "--", *built):
+            why.append(f"{name} has uncommitted changes")
     for tier in TIERS:
         try:
             with open(verdict_path(tier, ours, theirs)) as f:
@@ -299,6 +312,9 @@ def freshness() -> str:
         return f"no shale sources at {SHALE_SRC} (SHALE_CHECKOUT)"
     if not os.path.isdir(COBBLE_SRC):
         return f"no cobble-webbox sources at {COBBLE_SRC} (COBBLE_ROOT)"
+    for name, root, built in CHAT_LIBRARIES:
+        if not os.path.isdir(os.path.join(root, built[0])):
+            return f"no {name} sources at {os.path.join(root, built[0])}"
     escaped = []
     # Every folder down: Shale's interpreter is in shale's src/script/.
     for src in (SRC, WEBBOX_SRC, SHALE_SRC, COBBLE_SRC):

@@ -186,6 +186,15 @@ pub fn build(b: *std.Build) void {
     // this machine's `host_io`. -Dcobble-root=<dir> names another checkout.
     const cobble_root = b.option([]const u8, "cobble-root", "the cobble-webbox checkout") orelse
         pathFromRoot(b, "../cobble-webbox");
+    // **THE CHAT'S MARKDOWN AND ITS BROWSER CLIENT**, each its own checkout
+    // (chat-markdown, chat-client), which angry-gopher's chat imports as
+    // `chat_markdown` and `chat_client`: nothing but std, compiled as they
+    // are. -Dchat-markdown-root=<dir> and -Dchat-client-root=<dir> name
+    // others.
+    const markdown_root = b.option([]const u8, "chat-markdown-root", "the chat-markdown checkout") orelse
+        pathFromRoot(b, "../chat-markdown");
+    const client_root = b.option([]const u8, "chat-client-root", "the chat-client checkout") orelse
+        pathFromRoot(b, "../chat-client");
 
     const all = b.step("kernels", "every kernel");
     for (kernels) |k| {
@@ -292,6 +301,8 @@ pub fn build(b: *std.Build) void {
             .{ .name = "build_options", .module = build_opts.createModule() },
             .{ .name = "codex_chat", .module = codex_chat },
             .{ .name = "uo_town", .module = uo_town },
+            .{ .name = "chat_markdown", .module = b.createModule(.{ .root_source_file = .{ .cwd_relative = b.fmt("{s}/src/markdown.zig", .{markdown_root}) }, .red_zone = false }) },
+            .{ .name = "chat_client", .module = b.createModule(.{ .root_source_file = .{ .cwd_relative = b.fmt("{s}/js/bundles.zig", .{client_root}) }, .red_zone = false }) },
         },
     });
     const gopher = appKernel(b, b, .{
@@ -361,7 +372,7 @@ pub fn build(b: *std.Build) void {
         if (p == .none) continue;
         // The same port and checkout as this build's, or gopher.elf is
         // checked against the defaults' (or not at all) for every plant.
-        const one = b.addSystemCommand(&.{ b.graph.zig_exe, "build", "check", "check-apps", "-Dcoverage", b.fmt("-Dplant={s}", .{@tagName(p)}), b.fmt("-Dgopher-root={s}", .{gopher_root}), b.fmt("-Dwebbox-root={s}", .{webbox_root}), b.fmt("-Dshale-root={s}", .{shale_root}), b.fmt("-Dcobble-root={s}", .{cobble_root}) });
+        const one = b.addSystemCommand(&.{ b.graph.zig_exe, "build", "check", "check-apps", "-Dcoverage", b.fmt("-Dplant={s}", .{@tagName(p)}), b.fmt("-Dgopher-root={s}", .{gopher_root}), b.fmt("-Dwebbox-root={s}", .{webbox_root}), b.fmt("-Dshale-root={s}", .{shale_root}), b.fmt("-Dcobble-root={s}", .{cobble_root}), b.fmt("-Dchat-markdown-root={s}", .{markdown_root}), b.fmt("-Dchat-client-root={s}", .{client_root}) });
         one.setCwd(b.path("."));
         check_plants.dependOn(&one.step);
     }
@@ -381,7 +392,7 @@ pub fn build(b: *std.Build) void {
     // asset list is its table. tools/verdicts.py says whether it is fresh, as
     // gates.sh asks it, and one not fresh fails the check.
     const port_state: []const u8 = blk: {
-        const out = b.runAllowFail(&.{ "env", b.fmt("GOPHER_ROOT={s}", .{gopher_root}), b.fmt("WEBBOX_ROOT={s}", .{webbox_root}), b.fmt("SHALE_CHECKOUT={s}", .{shale_root}), b.fmt("COBBLE_ROOT={s}", .{cobble_root}), "python3", pathFromRoot(b, "tools/verdicts.py"), "fresh" }, &port_code, .ignore) catch break :blk "tools/verdicts.py could not be run";
+        const out = b.runAllowFail(&.{ "env", b.fmt("GOPHER_ROOT={s}", .{gopher_root}), b.fmt("WEBBOX_ROOT={s}", .{webbox_root}), b.fmt("SHALE_CHECKOUT={s}", .{shale_root}), b.fmt("COBBLE_ROOT={s}", .{cobble_root}), b.fmt("CHAT_MARKDOWN_ROOT={s}", .{markdown_root}), b.fmt("CHAT_CLIENT_ROOT={s}", .{client_root}), "python3", pathFromRoot(b, "tools/verdicts.py"), "fresh" }, &port_code, .ignore) catch break :blk "tools/verdicts.py could not be run";
         break :blk std.mem.trim(u8, out, " \t\r\n");
     };
     if (std.mem.eql(u8, port_state, "fresh")) {

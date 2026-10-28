@@ -197,13 +197,15 @@ this repo does not build.
 - **Disk tools:** mtools, `mkfs.vfat` and `fsck.fat` (dosfstools), `sgdisk`,
   and binutils' `as` and `ld` for the boot loader.
 - **The sibling checkouts**, in one folder beside this one: `zig-webbox`,
-  `angry-gopher`, `shale`, `cobble-webbox`, `zig-coverage-sdk`, and, for
-  the full checks, `metal-vmm`. `build.zig` finds them as `../<name>`
-  (`-Dgopher-root`, `-Dwebbox-root`, `-Dshale-root`, `-Dcobble-root` name
-  another place). **One rule for
+  `angry-gopher`, `shale`, `cobble-webbox`, `chat-markdown`, `chat-client`,
+  `zig-coverage-sdk`, and, for the full checks, `metal-vmm`. `build.zig`
+  finds them as `../<name>` (`-Dgopher-root`, `-Dwebbox-root`,
+  `-Dshale-root`, `-Dcobble-root`, `-Dchat-markdown-root`,
+  `-Dchat-client-root` name another place). **One rule for
   every script too:** a sibling is `../<name>` beside the checkout running
   it, in this repo and in metal-vmm; an environment variable names another
   place (`GOPHER_ROOT`, `WEBBOX_ROOT`, `SHALE_CHECKOUT`, `COBBLE_ROOT`,
+  `CHAT_MARKDOWN_ROOT`, `CHAT_CLIENT_ROOT`,
   `METAL_VMM`, `COVERAGE_SDK`, and metal-vmm's `GUESTS`, this repo's
   `probe/`).
 - **The pinned zig-coverage-sdk content.** `build.zig` names a hash of the
