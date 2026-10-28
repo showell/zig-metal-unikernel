@@ -7,6 +7,10 @@
         // Coverage properties (COVERAGE.md): a sibling checkout, as
         // angry-gopher and metal-vmm are.
         .zig_coverage_sdk = .{ .path = "../zig-coverage-sdk" },
+        // The Roc chat that angry-gopher's kernel serves: roc-webbox's
+        // `roc_chat_metal`, a sibling checkout. Lazy: only `zig build
+        // gopher` (and what builds it) reaches it.
+        .roc_webbox = .{ .path = "../roc-webbox", .lazy = true },
     },
     .paths = .{""},
 }
