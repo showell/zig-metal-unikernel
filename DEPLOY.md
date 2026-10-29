@@ -59,8 +59,7 @@ machine only encrypted.
 A release is a **boot image** and a **tag**. `vN` is the next number after
 the last tag (`git -C ~/showell_repos/zig-metal-unikernel tag -l 'v*'`).
 The image compiles angry-gopher's `zig-server/src`, zig-webbox's `src`,
-shale's `src`, cobble-webbox's `src` (Codex Chat and the UO town, which
-angry-gopher's router mounts with webbox's `combo.Mount`), and the chat's
+shale's `src`, and the chat's
 markdown (chat-markdown's `src`) and browser client (chat-client's `js`) from their sibling
 checkouts, so a release names each of their commits and this repo's, plus
 zig-coverage-sdk's, which the verdicts also key on (`tools/verdicts.py`).
@@ -125,8 +124,6 @@ zig-coverage-sdk's, which the verdicts also key on (`tools/verdicts.py`).
    - `curl -s -H "Authorization: Bearer $(cat ~/.gopher_api_key)" https://lynrummy.com/admin/host`
      shows this repo's commit and angry-gopher's (zig-webbox's is in the
      tag message, not on the page);
-   - each mounted application answers its page: `/codex-chat/` and
-     `/uo/town/`;
    - run the watchdog once: `ssh 162.243.1.123 python3 watchdog.py`. It
      lives in prod's home, kept current by angry-gopher's `ops/deploy`, and
      reads metal's address from `~/metal-url` there. **Right after a
@@ -306,8 +303,8 @@ Everything above is ours. To stand up your own lynrummy.com (Gopher Chat)
 or Dog Park:
 
 - **Fork and check out side by side:** zig-metal-unikernel, zig-webbox,
-  zig-coverage-sdk, shale, and angry-gopher (with cobble-webbox, which it
-  mounts, and chat-markdown and chat-client, which its chat imports) or dog-park; metal-vmm too, for tiers
+  zig-coverage-sdk, shale, and angry-gopher (with chat-markdown and
+  chat-client, which its chat imports) or dog-park; metal-vmm too, for tiers
   2-3 and the long tier. Zig 0.17. The README's "What you need" lists the
   rest (QEMU, mtools, dosfstools, KVM for metal-vmm).
 - **Try it locally first:** angry-gopher's `ops/start` (Linux, :9001), or

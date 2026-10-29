@@ -116,35 +116,6 @@ CASES = [
 JAR = "$JAR"
 
 
-# **CODEX CHAT'S SESSIONS ARE THE ANSWER'S, NOT THE COOKIE JAR'S**: register
-# answers a random token, and every later request carries it in its query
-# (`t=`). `chat_token("ann")` in a step's path is the token THIS side gave the
-# registration of ann.
-CHAT_REGISTER = re.compile(r"/codex-chat/api/chat/register\?name=([a-z]+)$")
-
-
-def chat_token(name: str) -> str:
-    return f"$CHAT:{name}"
-
-
-def with_chat_tokens(c: dict, tokens: dict) -> dict:
-    path = c["path"]
-    for name, token in tokens.items():
-        path = path.replace(chat_token(name), token)
-    return dict(c, path=path)
-
-
-def update_chat_tokens(c: dict, answer: dict, tokens: dict) -> dict:
-    m = CHAT_REGISTER.search(c["path"])
-    if not m or answer.get("status") != 200:
-        return tokens
-    try:
-        token = json.loads(answer["body"])["token"]
-    except (ValueError, KeyError, TypeError):
-        return tokens
-    return dict(tokens, **{m.group(1): token})
-
-
 def step(name, method, path, cookie=None, body=None, raw=None, headers=(), settle=0.0, expect=()):
     """One request in a story. `settle` waits before sending it.
 
@@ -380,29 +351,6 @@ LYNRUMMY_STORY = [
     step("its second", "POST", "/puzzles/sessions/1/puzzles/0/actions", JAR, "2) move"),
     step("the puzzles page, reloaded", "GET", "/puzzles", JAR),
     step("the game roster", "GET", "/admin/lynrummy", FRESH),
-]
-
-
-# CODEX CHAT, under /codex-chat beside Gopher Chat: Damian's ChatServer compiled
-# from Codex, its state in data/codex-chat/ (a file per account, a folder per
-# conversation with its messages appended).
-CHAT_API = "/codex-chat/api/chat"
-CODEX_CHAT_STORY = [
-    step("codex chat, without its slash", "GET", "/codex-chat"),
-    step("codex chat's page", "GET", "/codex-chat/"),
-    step("ann registers", "GET", f"{CHAT_API}/register?name=ann"),
-    step("bob registers", "GET", f"{CHAT_API}/register?name=bob"),
-    step("ann, by her token", "GET", f"{CHAT_API}/me?t={chat_token('ann')}"),
-    step("a token nobody holds", "GET", f"{CHAT_API}/me?t=0000000000000000"),
-    step("ann starts a chat with bob", "GET", f"{CHAT_API}/start?t={chat_token('ann')}&with=bob"),
-    step("ann writes", "GET", f"{CHAT_API}/send?t={chat_token('ann')}&to=c1&body=hi%20bob"),
-    step("bob answers", "GET", f"{CHAT_API}/send?t={chat_token('bob')}&to=c1&body=hi%20ann"),
-    step("bob reads the chat", "GET", f"{CHAT_API}/messages?t={chat_token('bob')}&conv=c1"),
-    step("bob's conversations", "GET", f"{CHAT_API}/conversations?t={chat_token('bob')}"),
-    step("ann makes a group", "GET", f"{CHAT_API}/group?t={chat_token('ann')}&name=all&members=ann,bob"),
-    step("ann writes to it", "GET", f"{CHAT_API}/send?t={chat_token('ann')}&to=c2&body=hello%20all"),
-    step("ann's conversations", "GET", f"{CHAT_API}/conversations?t={chat_token('ann')}"),
-    step("a route codex chat lacks", "GET", "/codex-chat/api/nope"),
 ]
 
 
@@ -854,7 +802,7 @@ QUICK = bool(os.environ.get("JUDGE_QUICK"))
 # answerable in one of those minutes. `JUDGE_ONLY=uploads` (probe/run.sh gopher
 # uploads) runs that gate and nothing else. An unknown name is an error, not a
 # silently complete run.
-GATES = ["cases", "members", "uids", "caps", "lynrummy", "codex-chat", "uo-town", "streams-linux", "streams-metal", "budget", "churn",
+GATES = ["cases", "members", "uids", "caps", "lynrummy", "streams-linux", "streams-metal", "budget", "churn",
          "bulk", "uploads", "lagging", "concurrent",
          "damaged", "endurance", "stamina", "admin-reset", "throttle", "retire", "secret", "shale-background"]
 # The boots that exist to be long. The quick tier leaves them out; asking for
@@ -1198,9 +1146,6 @@ COMPARED_HEADERS = ("location", "set-cookie", "content-type")
 UNIX_TIME = re.compile(rb"\b1[5-9]\d{8}\b")
 RFC3339 = re.compile(rb"\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\b")
 SESSION_MAC = re.compile(rb"\.<NOW>\.[A-Za-z0-9_-]{43}")
-# Codex Chat's stamp on a message, UTC `HH:mm`, as its answers and its files
-# spell it.
-CHAT_TIME = re.compile(rb'"time(-\d+)?":"(\d\d:\d\d)"')
 
 
 EASTERN = zoneinfo.ZoneInfo("America/New_York")
@@ -1213,24 +1158,17 @@ def eastern(unix: int) -> bytes:
     return d.strftime("%b %-d, %Y · %-I:%M %p %Z").encode()
 
 
-def normalize(data: bytes, window, tokens=None) -> bytes:
+def normalize(data: bytes, window) -> bytes:
     """Replace a time with <NOW> — but only one inside `window`, the span in which
     this side handled the request. A time outside it is left as it is, so a
     wrong clock is a difference rather than a wildcard.
 
     Two spellings: a Unix time, and the Eastern wall-clock text the session
     pages render. The second is minute-precise, so every minute the window
-    touches is tried, as for Codex Chat's UTC `HH:mm`.
-
-    `tokens` are the Codex Chat sessions this side handed out (`chat_tokens`),
-    each named for its holder: random, so the same story mints different ones."""
+    touches is tried."""
     lo, hi = window
-    for name, token in (tokens or {}).items():
-        data = data.replace(token.encode(), b"<TOKEN " + name.encode() + b">")
     # Every minute holding a second of the window, and none after it.
     touched = range(lo - lo % 60, hi + 1, 60)
-    minutes = {time.strftime("%H:%M", time.gmtime(t)).encode() for t in touched}
-    data = CHAT_TIME.sub(lambda m: m.group(0).replace(m.group(2), b"<NOW-HHMM>") if m.group(2) in minutes else m.group(0), data)
 
     def sub(m):
         return b"<NOW>" if lo <= int(m.group(0)) <= hi else m.group(0)
@@ -1285,8 +1223,8 @@ def differences(c: dict, metal: dict, linux: dict) -> list:
         # whole below; only the page itself differs on purpose.
         out += host_page_differences(metal["body"], linux["body"], metal.get("image"), metal.get("boot_disk"))
     else:
-        mb = normalize(metal["body"], metal["window"], metal.get("tokens"))
-        lb = normalize(linux["body"], linux["window"], linux.get("tokens"))
+        mb = normalize(metal["body"], metal["window"])
+        lb = normalize(linux["body"], linux["window"])
         if c.get("raw") is not None:
             # Metal always closes a connection; Linux may keep an HTTP/1.1 one
             # open. A raw step that must stay kept-alive (the no-length POST)
@@ -1687,7 +1625,7 @@ def run_story(elf, linux_bin, content, pristine, work, mnt, steps, label, report
 
     before = time.time()
     qemu, port, serial = start_kernel(elf, image, scratch)
-    metal_answers, jar, metal_tokens = [], {}, {}
+    metal_answers, jar = [], {}
     for i, s in enumerate(steps):
         if s.get("settle"):
             time.sleep(s["settle"])
@@ -1696,9 +1634,8 @@ def run_story(elf, linux_bin, content, pristine, work, mnt, steps, label, report
             # would only wait for a connection that will never come.
             metal_answers.append({"error": f"the kernel had already exited ({qemu.returncode})"})
             continue
-        a = ask(port, with_chat_tokens(with_jar(s, jar, minted), metal_tokens), os.path.join(scratch, f"k{i}"))
+        a = ask(port, with_jar(s, jar, minted), os.path.join(scratch, f"k{i}"))
         jar = update_jar(a, jar)
-        metal_tokens = update_chat_tokens(s, a, metal_tokens)
         metal_answers.append(a)
     code, log = finish_kernel(qemu, serial)
     metal_window = (int(before) - 1, int(time.time()) + 1)
@@ -1707,7 +1644,7 @@ def run_story(elf, linux_bin, content, pristine, work, mnt, steps, label, report
     shutil.copytree(content, root)
     before = time.time()
     server = LinuxServer(linux_bin, root, os.path.join(scratch, "linux.log"))
-    linux_answers, jar, linux_tokens = [], {}, {}
+    linux_answers, jar = [], {}
     try:
         for i, s in enumerate(steps):
             if s.get("settle"):
@@ -1718,9 +1655,8 @@ def run_story(elf, linux_bin, content, pristine, work, mnt, steps, label, report
             if server.proc.poll() is not None:
                 linux_answers.append({"error": f"the Linux server had exited ({server.proc.returncode}): {server.last_words()}"})
                 continue
-            a = ask(server.port, with_chat_tokens(with_jar(s, jar, minted), linux_tokens), os.path.join(scratch, f"l{i}"))
+            a = ask(server.port, with_jar(s, jar, minted), os.path.join(scratch, f"l{i}"))
             jar = update_jar(a, jar)
-            linux_tokens = update_chat_tokens(s, a, linux_tokens)
             linux_answers.append(a)
     finally:
         server.stop()
@@ -1743,8 +1679,8 @@ def run_story(elf, linux_bin, content, pristine, work, mnt, steps, label, report
                + " | ".join(log.splitlines()[-3:]))
     for s, m, l in zip(steps, metal_answers, linux_answers):
         m = dict(m, guest_exit=1, window=metal_window, serial=log, image=image,
-                 boot_disk=os.path.join(scratch, "droplet.img") if DROPLET else None, tokens=metal_tokens)
-        l = dict(l, window=linux_window, tokens=linux_tokens)
+                 boot_disk=os.path.join(scratch, "droplet.img") if DROPLET else None)
+        l = dict(l, window=linux_window)
         diffs = differences(s, m, l)
         if diffs:
             failures += 1
@@ -1790,8 +1726,8 @@ def run_story(elf, linux_bin, content, pristine, work, mnt, steps, label, report
     for rel in sorted(set(metal_tree) | set(linux_tree)):
         m = metal_tree.get(rel)
         l = linux_tree.get(rel)
-        nm = None if m is None else normalize(m, metal_window, metal_tokens)
-        nl = None if l is None else normalize(l, linux_window, linux_tokens)
+        nm = None if m is None else normalize(m, metal_window)
+        nl = None if l is None else normalize(l, linux_window)
         if nm != nl:
             failures += 1
             report(f"FAIL  {label}: {rel}: metal has {abbrev(nm)}, Linux has {abbrev(nl)}")
@@ -2888,96 +2824,6 @@ def metal_sse_failures(elf, pristine, work, mnt, report) -> int:
     return failures + metal_tab_failures(elf, pristine, work, mnt, report)
 
 
-def uo_town_failures(elf, pristine, work, mnt, report) -> int:
-    """**THE UO TOWN, ON THE MACHINE** (cobble-webbox's uo_town, mounted at /uo):
-    one boot, each answer held to what it must say, not to Linux's (the town's
-    answers carry its clocks and its host). The page and the map; a paused
-    town at six; a seat taken and walked; a speed set, then the town seen to
-    have moved on between requests (the kernel's `between`); a start-over."""
-    town = "/uo/town"
-    failures = 0
-
-    def fail(why):
-        nonlocal failures
-        failures += 1
-        report(f"FAIL  uo-town: {why}")
-
-    def now(label):
-        a = ask(port, step(label, "GET", f"{town}/now"), scratch, patience=60)
-        try:
-            return json.loads(a["body"]) if a.get("status") == 200 else None
-        except (ValueError, KeyError):
-            return None
-
-    asked = 11
-    scratch, qemu, port, serial = boot_with(elf, pristine, work, mnt, asked + 1)
-    try:
-        bare = ask(port, step("the town, without its slash", "GET", town), scratch, patience=60)
-        # Relative, as the town answers from its own `/` wherever it is
-        # mounted: `town/` from /uo/town is /uo/town/.
-        if bare.get("status") != 303 or bare.get("headers", {}).get("location") != "town/":
-            fail(f"{town} answered {bare.get('status')} to {bare.get('headers', {}).get('location')!r}, want 303 to town/")
-        page = ask(port, step("the page", "GET", f"{town}/"), scratch)
-        if page.get("status") != 200 or b"<html" not in page.get("body", b"").lower():
-            fail(f"the page answered {page.get('status')}, not a page")
-        shown = ask(port, step("the map", "GET", f"{town}/map"), scratch)
-        try:
-            shops = json.loads(shown["body"])["shops"]
-        except (ValueError, KeyError, TypeError):
-            shops = []
-        if shown.get("status") != 200 or not shops:
-            fail(f"the map answered {shown.get('status')} with no shops")
-        first = now("the town at the start")
-        if first is None:
-            fail("/now did not answer JSON")
-            first = {}
-        elif (first.get("speed"), first.get("hour")) != (0, 6) or not first.get("people") \
-                or first.get("server", {}).get("host") != "bare metal (the unikernel)":
-            fail(f"the town at the start is speed {first.get('speed')}, hour {first.get('hour')}, "
-                 f"{len(first.get('people', []))} people, host {first.get('server', {}).get('host')!r}: "
-                 f"want paused at six, people in it, on bare metal")
-        joined = ask(port, step("Ann joins", "POST", f"{town}/join?name=Ann"), scratch)
-        try:
-            token = json.loads(joined["body"])["token"]
-        except (ValueError, KeyError, TypeError):
-            token = ""
-        if joined.get("status") != 200 or not re.fullmatch(r"[0-9a-f]{16}", token):
-            fail(f"Ann's join answered {joined.get('status')} {joined.get('body', b'')[:80]!r}, not a seat's token")
-        walked = ask(port, step("Ann walks", "POST", f"{town}/go?t={token}&x=1460&y=1600"), scratch)
-        if walked.get("status") != 204:
-            fail(f"Ann's walk answered {walked.get('status')}, want 204")
-        stranger = ask(port, step("a token nobody holds", "POST", f"{town}/go?t=0000000000000000&x=1460&y=1600"), scratch)
-        if stranger.get("status") != 403:
-            fail(f"a walk by a token nobody holds answered {stranger.get('status')}, want 403")
-        sped = ask(port, step("the town set going", "POST", f"{town}/speed?x=600"), scratch)
-        if sped.get("status") != 204:
-            fail(f"setting the speed answered {sped.get('status')}, want 204")
-        time.sleep(2)
-        later = now("the town two seconds on") or {}
-        if later.get("speed") != 600 or not later.get("seconds", 0) > first.get("seconds", 0) \
-                or not later.get("server", {}).get("ticks", 0) > first.get("server", {}).get("ticks", 0):
-            fail(f"two seconds at speed 600 the town reads speed {later.get('speed')}, game second "
-                 f"{later.get('seconds')} (was {first.get('seconds')}), ticks {later.get('server', {}).get('ticks')} "
-                 f"(was {first.get('server', {}).get('ticks')}): it never moved on between requests")
-        reset = ask(port, step("the town started over", "POST", f"{town}/reset"), scratch)
-        if reset.get("status") != 204:
-            fail(f"the start-over answered {reset.get('status')}, want 204")
-        again = now("the town started over") or {}
-        if again.get("epoch") != first.get("epoch", 0) + 1 or (again.get("speed"), again.get("hour")) != (0, 6):
-            fail(f"after the start-over the town is epoch {again.get('epoch')} (was {first.get('epoch')}), "
-                 f"speed {again.get('speed')}, hour {again.get('hour')}: want the next epoch, paused at six")
-        ask(port, step("the last request", "GET", "/nope"), scratch, patience=60)
-    finally:
-        code, log = finish_kernel(qemu, serial)
-    if code != 1:
-        fail("the kernel exited " + str(code) + ": " + " | ".join(log.splitlines()[-3:]))
-    if not failures:
-        report(f"ok    the UO town on the machine: {asked} requests to ONE boot under {town} — the page, "
-               f"the map, a seat taken and walked, the town moving on between requests, a start-over")
-    shutil.rmtree(scratch, ignore_errors=True)
-    return failures
-
-
 def metal_tab_failures(elf, pristine, work, mnt, report) -> int:
     scratch = tempfile.mkdtemp(dir=work)
     image = os.path.join(scratch, "disk.img")
@@ -3683,50 +3529,6 @@ def main() -> int:
                   f"and its moves, a puzzle and its moves, both reloaded, the roster — each answered as "
                   f"Linux answered, all {files} files agree")
         lap("Lyn Rummy story")
-
-    # ── Codex Chat ───────────────────────────────────────────────────────────
-    if running("codex-chat"):
-        f, _, answers, files = run_story(elf, linux_bin, content, pristine, work, mnt,
-                                         CODEX_CHAT_STORY, "codex-chat", print)
-        failures += f
-        # As each step's name says, not merely alike on both. ChatServer
-        # answers its own refusals 200 with an "error" in the JSON.
-        by_name = {s["name"]: a for s, a in zip(CODEX_CHAT_STORY, answers)}
-        body = lambda name: by_name[name].get("body") or b""
-        want = {s["name"]: 200 for s in CODEX_CHAT_STORY}
-        want.update({"codex chat, without its slash": 303, "a route codex chat lacks": 200})
-        wrong = [f"{name} answered {by_name[name].get('status')}, want {st}"
-                 for name, st in want.items() if by_name[name].get("status") != st]
-        if not wrong:
-            checks = [
-                ("codex chat's page", b"<html"),
-                ("ann registers", b'"name":"ann"'),
-                ("ann, by her token", b'{"name":"ann"}'),
-                ("a token nobody holds", b'{"error":"auth"}'),
-                ("ann starts a chat with bob", b'{"convId":"c1"}'),
-                ("ann writes", b'{"ok":true}'),
-                ("bob reads the chat", b'"body-0":"hi bob","sender-0":"ann"'),
-                ("bob reads the chat", b'"body-1":"hi ann","sender-1":"bob"'),
-                ("ann makes a group", b'{"convId":"c2"}'),
-                ("ann's conversations", b'"name-1":"all","preview-1":"hello all"'),
-            ]
-            wrong += [f"{name} answered {body(name)[:120]!r}, which lacks {piece!r}"
-                      for name, piece in checks if piece not in body(name)]
-            if not re.fullmatch(rb'\{"token":"[0-9a-f]{16}","name":"ann"\}', body("ann registers")):
-                wrong.append(f"ann's registration is not a 16-digit token: {body('ann registers')!r}")
-        for w in wrong:
-            failures += 1
-            print(f"FAIL  codex-chat: {w}")
-        if not f and not wrong:
-            print(f"ok    the Codex Chat story: {len(CODEX_CHAT_STORY)} requests to ONE boot under "
-                  f"/codex-chat — two accounts, a chat and a group, written and read back — each "
-                  f"answered as Linux answered, all {files} files agree")
-        lap("Codex Chat story")
-
-    # ── the UO town, on the machine ──────────────────────────────────────────
-    if running("uo-town"):
-        failures += uo_town_failures(elf, pristine, work, mnt, print)
-        lap("UO town")
 
     # ── a live stream, on both ───────────────────────────────────────────────
     if running("streams-linux"):

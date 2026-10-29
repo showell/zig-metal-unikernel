@@ -81,8 +81,6 @@ WEBBOX_ROOT="${WEBBOX_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/zig
 export WEBBOX_ROOT
 SHALE_CHECKOUT="${SHALE_CHECKOUT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/shale}"
 export SHALE_CHECKOUT
-COBBLE_ROOT="${COBBLE_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/cobble-webbox}"
-export COBBLE_ROOT
 CHAT_MARKDOWN_ROOT="${CHAT_MARKDOWN_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/chat-markdown}"
 CHAT_CLIENT_ROOT="${CHAT_CLIENT_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/chat-client}"
 export CHAT_MARKDOWN_ROOT CHAT_CLIENT_ROOT
@@ -203,9 +201,9 @@ if [ "$want" != sim ]; then
     # bug that only the release kernel's timing reaches is outside this tier. (Before the door, a coverage kernel printed its
     # catalog a byte an exit, and v19's first long.sh failed every route on
     # it while the release kernel served each page whole.)
-    zig build gopher -Dcoverage -Dgopher-root="$GOPHER_ROOT" -Dwebbox-root="$WEBBOX_ROOT" -Dshale-root="$SHALE_CHECKOUT" -Dcobble-root="$COBBLE_ROOT" -Dchat-markdown-root="$CHAT_MARKDOWN_ROOT" -Dchat-client-root="$CHAT_CLIENT_ROOT" > "$OUT/build.log" 2>&1 || { echo "gopher.elf -Dcoverage does not build: $OUT/build.log"; exit 2; }
+    zig build gopher -Dcoverage -Dgopher-root="$GOPHER_ROOT" -Dwebbox-root="$WEBBOX_ROOT" -Dshale-root="$SHALE_CHECKOUT" -Dchat-markdown-root="$CHAT_MARKDOWN_ROOT" -Dchat-client-root="$CHAT_CLIENT_ROOT" > "$OUT/build.log" 2>&1 || { echo "gopher.elf -Dcoverage does not build: $OUT/build.log"; exit 2; }
     cp probe/gopher.elf "$OUT/gopher-coverage.elf"
-    zig build gopher -Dgopher-root="$GOPHER_ROOT" -Dwebbox-root="$WEBBOX_ROOT" -Dshale-root="$SHALE_CHECKOUT" -Dcobble-root="$COBBLE_ROOT" -Dchat-markdown-root="$CHAT_MARKDOWN_ROOT" -Dchat-client-root="$CHAT_CLIENT_ROOT" > "$OUT/rebuild.log" 2>&1 || { echo "gopher.elf does not build: $OUT/rebuild.log"; exit 2; }
+    zig build gopher -Dgopher-root="$GOPHER_ROOT" -Dwebbox-root="$WEBBOX_ROOT" -Dshale-root="$SHALE_CHECKOUT" -Dchat-markdown-root="$CHAT_MARKDOWN_ROOT" -Dchat-client-root="$CHAT_CLIENT_ROOT" > "$OUT/rebuild.log" 2>&1 || { echo "gopher.elf does not build: $OUT/rebuild.log"; exit 2; }
     JUDGED=probe/gopher.elf
     COUNTED="$OUT/gopher-coverage.elf"
     lap "the metal half's builds (the site volume, metal-vmm, two kernels)"

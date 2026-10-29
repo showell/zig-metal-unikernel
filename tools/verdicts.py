@@ -56,11 +56,6 @@ WEBBOX_BUILT = ("src", "build.zig", "build.zig.zon")
 SHALE_CHECKOUT = os.path.realpath(os.environ.get("SHALE_CHECKOUT", os.path.join(ROOT, "..", "shale")))
 SHALE_SRC = os.path.join(SHALE_CHECKOUT, "src")
 SHALE_BUILT = WEBBOX_BUILT
-# cobble-webbox's checkout, whose `codex_chat` (Codex Chat, under
-# /codex-chat) angry-gopher's kernel compiles, with the page it embeds.
-COBBLE_ROOT = os.path.realpath(os.environ.get("COBBLE_ROOT", os.path.join(ROOT, "..", "cobble-webbox")))
-COBBLE_SRC = os.path.join(COBBLE_ROOT, "src")
-COBBLE_BUILT = ("src", "assets.zon", "web/chat.html", "web/uo-town.html")
 # The chat's markdown (chat-markdown) and its browser client (chat-client),
 # which angry-gopher's kernel compiles and embeds.
 MARKDOWN_ROOT = os.path.realpath(os.environ.get("CHAT_MARKDOWN_ROOT", os.path.join(ROOT, "..", "chat-markdown")))
@@ -151,7 +146,6 @@ def content_id() -> str:
     for repo, root, rels in (("angry-gopher", GOPHER_ROOT, served_files()),
                              ("zig-webbox", WEBBOX_ROOT, sorted(walk(WEBBOX_ROOT, WEBBOX_BUILT))),
                              ("shale", SHALE_CHECKOUT, sorted(walk(SHALE_CHECKOUT, SHALE_BUILT))),
-                             ("cobble-webbox", COBBLE_ROOT, sorted(walk(COBBLE_ROOT, COBBLE_BUILT))),
                              *((name, root, sorted(walk(root, built))) for name, root, built in CHAT_LIBRARIES)):
         for rel in rels:
             h.update(f"{repo}/{rel}".encode() + b"\0")
@@ -265,8 +259,6 @@ def require() -> list:
         why.append("zig-webbox has uncommitted changes")
     if git(SHALE_CHECKOUT, "status", "--porcelain", "--untracked-files=no", "--", *SHALE_BUILT):
         why.append("shale has uncommitted changes")
-    if git(COBBLE_ROOT, "status", "--porcelain", "--untracked-files=no", "--", *COBBLE_BUILT):
-        why.append("cobble-webbox has uncommitted changes")
     for name, root, built in CHAT_LIBRARIES:
         if git(root, "status", "--porcelain", "--untracked-files=no", "--", *built):
             why.append(f"{name} has uncommitted changes")
@@ -310,14 +302,12 @@ def freshness() -> str:
         return f"no zig-webbox sources at {WEBBOX_SRC} (WEBBOX_ROOT)"
     if not os.path.isdir(SHALE_SRC):
         return f"no shale sources at {SHALE_SRC} (SHALE_CHECKOUT)"
-    if not os.path.isdir(COBBLE_SRC):
-        return f"no cobble-webbox sources at {COBBLE_SRC} (COBBLE_ROOT)"
     for name, root, built in CHAT_LIBRARIES:
         if not os.path.isdir(os.path.join(root, built[0])):
             return f"no {name} sources at {os.path.join(root, built[0])}"
     escaped = []
     # Every folder down: Shale's interpreter is in shale's src/script/.
-    for src in (SRC, WEBBOX_SRC, SHALE_SRC, COBBLE_SRC):
+    for src in (SRC, WEBBOX_SRC, SHALE_SRC):
         for folder, _, names in sorted(os.walk(src)):
             for name in sorted(names):
                 if name.endswith(".zig") and name != "host_io_std.zig":

@@ -35,9 +35,8 @@ metal-vmm's default machine) it spins.
 `build.zig` compiles, unchanged and uncopied, angry-gopher's
 `zig-server/src/*.zig` from its checkout (`-Dgopher-root`, `../angry-gopher`
 by default), the webbox library from zig-webbox's (`-Dwebbox-root`,
-`../zig-webbox`), Shale from shale's (`-Dshale-root`, `../shale`), and
-cobble-webbox's Codex Chat and UO town from its (`-Dcobble-root`,
-`../cobble-webbox`). Every file that does I/O opens with
+`../zig-webbox`), and Shale from shale's (`-Dshale-root`, `../shale`).
+Every file that does I/O opens with
 `const Io = @import("host_io").Io;`, and this build hands them
 `src/host_io_metal.zig` as `host_io`; angry-gopher's
 `tools/lint_portable.shale` refuses a file in the route table's reach that

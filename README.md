@@ -84,10 +84,6 @@ two.
 - **[angry-gopher](https://github.com/showell/angry-gopher)**, Steve
   Howell's personal site, lynrummy.com: a chat and a handful of small apps
   (Lyn Rummy, a two-player rummy game, among them). **In production on this kernel.**
-  It is a combination (webbox's `combo.Mount`, in angry-gopher's
-  `zig-server/src/router.zig`): angry-gopher keeps `/`, and
-  [cobble-webbox](https://github.com/showell/cobble-webbox)'s Codex Chat
-  is mounted at `/codex-chat` and its UO town at `/uo`.
 - **[dog-park](https://github.com/showell/dog-park)**, a small herding
   game on zig-webbox. **In production on this kernel**, at
   dogpark.lynrummy.com, on its own droplet. dog-park builds its own image,
@@ -129,10 +125,6 @@ The repos, kept separate, checked out side by side:
   applications are written against.
 - **angry-gopher** and **dog-park**: the applications (above). angry-gopher
   is compiled from its checkout as it is; nothing is copied in.
-- **[cobble-webbox](https://github.com/showell/cobble-webbox)**: Codex
-  games compiled to Zig webbox apps. `zig build gopher` compiles its
-  `codex_chat` and `uo_town` modules from `../cobble-webbox` (`-Dcobble-root`),
-  since angry-gopher's router imports them.
 - **[shale](https://github.com/showell/shale)**: the script language
   behind `/admin/script`; every application's kernel compiles it from
   `../shale` (`-Dshale-root`).
@@ -197,14 +189,14 @@ this repo does not build.
 - **Disk tools:** mtools, `mkfs.vfat` and `fsck.fat` (dosfstools), `sgdisk`,
   and binutils' `as` and `ld` for the boot loader.
 - **The sibling checkouts**, in one folder beside this one: `zig-webbox`,
-  `angry-gopher`, `shale`, `cobble-webbox`, `chat-markdown`, `chat-client`,
+  `angry-gopher`, `shale`, `chat-markdown`, `chat-client`,
   `zig-coverage-sdk`, and, for the full checks, `metal-vmm`. `build.zig`
   finds them as `../<name>` (`-Dgopher-root`, `-Dwebbox-root`,
-  `-Dshale-root`, `-Dcobble-root`, `-Dchat-markdown-root`,
+  `-Dshale-root`, `-Dchat-markdown-root`,
   `-Dchat-client-root` name another place). **One rule for
   every script too:** a sibling is `../<name>` beside the checkout running
   it, in this repo and in metal-vmm; an environment variable names another
-  place (`GOPHER_ROOT`, `WEBBOX_ROOT`, `SHALE_CHECKOUT`, `COBBLE_ROOT`,
+  place (`GOPHER_ROOT`, `WEBBOX_ROOT`, `SHALE_CHECKOUT`,
   `CHAT_MARKDOWN_ROOT`, `CHAT_CLIENT_ROOT`,
   `METAL_VMM`, `COVERAGE_SDK`, and metal-vmm's `GUESTS`, this repo's
   `probe/`).
@@ -258,8 +250,7 @@ link script, `metal` and `gm_build`; `-Drestart` and `-Dcoverage` are
 options of the dependency. `zig build gopher` goes through the same
 function.
 
-**Who calls it:** this repo's `zig build gopher` (angry-gopher, with
-cobble-webbox's Codex Chat and UO town as its `parts`) and
+**Who calls it:** this repo's `zig build gopher` (angry-gopher) and
 `zig build sleeper`; dog-park's
 `zig build metal` and `zig build metal-dogpark-todo`; roc-webbox's and
 observatory's `zig build metal`. Each kernel's build lives in its
@@ -287,9 +278,6 @@ embedded files, as the top module does. dog-park's `build.zig`
   binary's root, which is `probe/gopher.zig`; it forwards the
   application's `roc_hooks` declaration when the root has one
   (roc-webbox's `roc_hooks` module), and declares an empty one otherwise.
-- **gopher.elf's parts** are cobble-webbox's two modules, built from
-  `-Dcobble-root`'s sources, their pages named by cobble-webbox's
-  `assets.zon`.
 
 Useful options: `-Ddev` builds Debug kernels, which rebuild in seconds instead
 of tens of seconds (releases are ReleaseSafe, and every run says which it
@@ -311,7 +299,7 @@ script that judges it:
 `probe/run.sh gopher` needs angry-gopher's Linux build too; it builds it.
 A part name it does not know is an error that lists them all; the list is
 `GATES` in `probe/judge_gopher.py` (among them `cases`, `members`,
-`codex-chat`, `uo-town`, `uploads`). Run directly, the judge takes four paths
+`lynrummy`, `uploads`). Run directly, the judge takes four paths
 (its docstring), given absolute, and `JUDGE_ONLY=<gate,…>` narrows it.
 `droplet/droplet.sh` is QEMU laid out like a droplet (the same chipset and
 devices in the same slots, recorded from a real one); its header lists its
@@ -354,7 +342,7 @@ cheapest first, and stops at the first one that fails.
 | `./tier0.sh` | zig 0.17, Python 3, and the SDK beside this checkout | the unit tests and short simulator runs; this repo's kernels and host programs type-check; `zig fmt` and the lints; tcp_sim's golden traces. No QEMU, no other repo, no network, no root. Run it on every change | ~2-3 min |
 | `./tier1.sh` | + QEMU, dosfstools, gdisk, mtools, curl, binutils, `sudo -n` for loop mounts and the TAP device; KVM for the droplet boots (or `ACCEL=tcg`) | tcp.zig against Linux's own TCP, as server and as client (the native judge, quick, ~25 s, first); each test kernel ("probe") boots and works on virtual hardware; the judges' own tests; the droplet's boot loader and image; the sleeper sleeping on a real timer, woken by its timer and by a request (`droplet/sleeps.py`, KVM) | ~25 s native, ~45 s of probes, then the droplet boots, ~10 s of sleeps |
 | `./tier2.sh` | + metal-vmm beside this checkout, and /dev/kvm | metal-vmm runs this checkout's probe kernels the same as QEMU does, and the same twice | minutes |
-| `./tier3.sh` | + zig-webbox, shale, cobble-webbox and angry-gopher beside this checkout | the library's tests and the limits it copies; the unit tests' pinned body rule is still the library's; gopher.elf type-checks, builds and is judged against its Linux build on QEMU's microvm and the droplet-shaped machine; the PC-shaped machine's rests and the timeouts on metal-vmm; a sleeping kernel in the machine's own time (metal-vmm `sleeps.sh`: an idle gopher.elf's cost, the sleeper's hour of wakes, the longest rest) | ~20 min |
+| `./tier3.sh` | + zig-webbox, shale, chat-markdown, chat-client and angry-gopher beside this checkout | the library's tests and the limits it copies; the unit tests' pinned body rule is still the library's; gopher.elf type-checks, builds and is judged against its Linux build on QEMU's microvm and the droplet-shaped machine; the PC-shaped machine's rests and the timeouts on metal-vmm; a sleeping kernel in the machine's own time (metal-vmm `sleeps.sh`: an idle gopher.elf's cost, the sleeper's hour of wakes, the longest rest) | ~20 min |
 | `zig build properties` | as tier 0 | the simulators over many seeds, judged by their coverage properties: zig alone, but not in tier 0 for its time (20 min in Debug, 5 with `-Dsweep-optimize=ReleaseSafe`); long.sh runs it at its `SEEDS`, `CROWD_SEEDS` and `FAT_SEEDS` (the top of `long.sh` says how each was chosen) | 5-20 min |
 | `zig build tcp-traces` | as tier 0 (it runs it) | tcp_sim's golden traces: the hash of every frame for every world (seeds 1-200 of each peer, and the regressions; a line each in `coverage/tcp-traces.txt`), against that file, so reshaping tcp.zig leaves the wire as it was; `-Dtcp-traces-write` writes them again, and the commit says why | ~25 s, built |
 | `./gates.sh quick` | as tier 3 | tiers 0 and 1, then gopher.elf and one chat-judge story | |
@@ -431,7 +419,7 @@ To find it:
 | FAT16 and FAT32, read and write | served | long names, folders, append, replace, delete; checked by `fsck` and by Linux reading what it wrote. Production's volume is FAT32 |
 | clocks and entropy | served | the CMOS real-time clock; the TSC's rate measured against the PIT; random bytes from virtio-rng where the machine has one, and RDRAND |
 | angry-gopher's whole site | served | every route, judged equal to the Linux build, including chat's live streams and uploads |
-| a combination's applications as `parts` | served | gopher.elf's Codex Chat and UO town; also dog-park's `metal-dogpark-todo` (Dog Park with roc-webbox's TODO list), deployed nowhere |
+| a combination's applications as `parts` | served | dog-park's `metal-dogpark-todo` (Dog Park with roc-webbox's TODO list), deployed nowhere |
 | another repository's application as a kernel | served | Dog Park, on dogpark.lynrummy.com, built through `addAppKernel` and `droplet/app_image.py` (dog-park's DEPLOY.md says which image serves); one disk, no volume. This repo neither builds nor judges any application but angry-gopher (an application is not this repo's test of itself); Dog Park's own QEMU gate and droplet rehearsal check its image |
 | file contents kept in memory | served | after their first read, write-through (`page_cache_mib`, 64 MiB by default) |
 | large disk requests | served | a run of contiguous clusters is one request of up to 1 MiB (the least of the disk's, the controller's and our own limit) |
