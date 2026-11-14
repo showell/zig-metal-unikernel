@@ -118,7 +118,7 @@ pub const Store = struct {
     /// **THE STORE A `*T` IS**: its vtable made from `T`'s own `read`,
     /// `write`, `append`, `list`, `remove` and `replace`, each called on the
     /// `T` behind the pointer. Each store wrote these six casts by hand, the
-    /// same each time (shale's cookbook/zig/clones.shale found the three).
+    /// same each time (shale's cookbook/zig/find_clones.shale found the three).
     pub fn of(comptime T: type, ptr: *T) Store {
         return .{ .ptr = ptr, .vtable = vtableOf(T) };
     }
