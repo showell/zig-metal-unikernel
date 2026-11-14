@@ -2,16 +2,13 @@
 //!
 //! **SECTOR 0 IS NOT THE FILESYSTEM.** On a GPT disk, LBA 0 is a protective
 //! MBR whose only job is to stop old tools thinking the disk is empty; the
-//! real table is at LBA 1 and the volume starts wherever it says. Cobblestone's
-//! fixtures are laid out this way — one "EFI System" partition at LBA 2048 —
-//! which is why its `Fat16` cites a `Gpt` chapter, and why a FAT16 reader that
-//! mounts sector 0 gets a boot sector of zeros and concludes, correctly and
+//! real table is at LBA 1 and the volume starts wherever it says, so a FAT16
+//! reader that mounts sector 0 gets a boot sector of zeros and concludes, correctly and
 //! uselessly, that the volume is not FAT16.
 //!
 //! Only what is needed to answer "where does the data partition start?": the
 //! first partition that is not zig-metal-unikernel's own kernel partition (a droplet's
-//! disk has both; Cobblestone's fixtures and the judge's volumes have only the
-//! data). That one type GUID is the only one interpreted; no CRCs are
+//! disk has both; the judge's volumes have only the data). That one type GUID is the only one interpreted; no CRCs are
 //! checked, and nothing is written.
 
 const std = @import("std");

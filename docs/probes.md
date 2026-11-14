@@ -14,9 +14,7 @@ proves bytes moved; writing and comparing proves they moved **where we said**.
 
 **`net`** brings the NIC up and takes a DHCP lease. QEMU's user-mode
 networking answers DHCP at 10.0.2.2 with nothing configured, so the result
-needs no second machine — and it is the same exchange Cobblestone's
-`dhcp-acquire` performs through the Roc machine and an emulated NE2000. Two
-paths, one protocol, one answer to compare.
+needs no second machine.
 
 **`http`** takes a lease, listens on port 80 and answers one request.
 **Its verdict is not its own output** — QEMU forwards a host port to the

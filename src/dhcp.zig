@@ -5,11 +5,6 @@
 //! there is a server on the other side of QEMU's user-mode networking that
 //! answers it without anything being configured.
 //!
-//! It is also the same exchange Cobblestone's `dhcp-acquire` performs through
-//! the Roc machine, which makes the two directly comparable -- one written in
-//! zig against a virtio NIC, one in Roc against an emulated NE2000, both
-//! ending in a lease. That was the point of doing this one first.
-//!
 //! **A LOST MESSAGE IS ASKED AGAIN** (RFC 2131 §4.1): each message waits about
 //! four seconds for its answer, then is sent again, the wait doubling up to 64
 //! seconds, each wait moved by up to a second either way at random so that

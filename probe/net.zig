@@ -5,10 +5,6 @@
 //! built on it. QEMU's user-mode networking runs a DHCP server at 10.0.2.2
 //! with nothing configured, so a lease is a checkable result that needs no
 //! second machine.
-//!
-//! It is also the same exchange Cobblestone's `dhcp-acquire` performs through
-//! the Roc machine and an emulated NE2000. Two paths, one protocol, one answer
-//! to compare.
 
 const metal = @import("metal");
 const serial = metal.serial;
