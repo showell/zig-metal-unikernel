@@ -78,7 +78,10 @@ and a slow handler is a bug on metal already.
 application never flushes; the host flushes at the one moment that matters,
 before any byte of a response or of a kept stream's frame goes out. A failed
 flush is logged and counted, the response still goes, and the next one
-tries again.
+tries again. A new path that sends bytes, or says a write is saved, makes the
+writes ahead of it durable first; one that does not says why in a comment,
+or the omission is taken for a bug, since a missing flush is silent until
+the power fails.
 
 - **Metal:** `io.durable` (`src/io_volumes.zig`, re-exported by `src/io.zig`), called from `Stream.sendAll`
   (`src/stream.zig`), flushes each disk that has writes it may not have

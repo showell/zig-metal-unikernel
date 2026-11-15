@@ -374,7 +374,16 @@ each record their verdict against what they judged: this repo's commit, the
 SDK's, the compiler's `zig version`, and a hash of every application and
 library file the kernel compiles (`tools/verdicts.py` calls that hash the
 **content id**). The quick tier and a
-partial `long.sh` record nothing.
+partial `long.sh` record nothing. A run also records nothing when a tree it
+judges moves under it, and one edited tracked file is enough (`-dirty`), so
+while `gates.sh` or `long.sh` runs, edits go in a `git worktree` of their
+own, as `tools/soak.sh` makes for the soak.
+
+**A long job is an installed program, run directly.** Under `zig build`, the
+build runner holds a test's output until it exits and fails a step whose
+test wrote to stderr, so a long job run as a test shows an empty log for
+hours. The soak is built by `zig build soak-build` and `tools/soak.sh` runs
+`zig-out/bin/soak` itself.
 
 ### Deploying
 
