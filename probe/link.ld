@@ -6,8 +6,8 @@
    drop it. `:text :note` puts the one section in both segments: loaded with
    everything else, and findable as a note.
 
-   1 MB is where codex-vm loads a Codex kernel and where a loader will happily
-   put this one. Nothing below it is ours. */
+   1 MB is where a loader will happily put this one. Nothing below it is
+   ours. */
 ENTRY(_start)
 
 PHDRS {

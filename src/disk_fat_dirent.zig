@@ -83,7 +83,7 @@ pub const Dos = struct {
 };
 
 pub const Entry = struct {
-    /// The 8.3 alias, trimmed and dotted: "CODEX.CDX", "SESSIO~1".
+    /// The 8.3 alias, trimmed and dotted: "README.TXT", "SESSIO~1".
     name: [12]u8,
     name_len: u8,
     /// The same alias as it sits on disk: eleven bytes, space padded.
