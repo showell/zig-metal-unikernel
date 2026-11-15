@@ -294,8 +294,9 @@ droplet (Destroy → Restore base image). It has **one disk: a release starts ev
     Kill the old one by the PID in `PID`, never by pattern. Write the new
     PID (from `ss -ltnp`) back to `PID`.
   - An open page then says "the server restarted: reload": expected.
-- **The essay surface, :9100:** essay-repl-server, `notes/<slug>.md`
-  (CLAUDE.md).
+- **The essay surface, 127.0.0.1:9301:** essay-surface, run from
+  `~/essay-dogfood`; private and transient, its notes never committed
+  (`~/.claude/CLAUDE.md`).
 
 ## Running your own copies
 
