@@ -318,8 +318,8 @@ droplet boots it: lay it on a disk image with
 docstring), then `DISK=<out.img> PUBLIC_FWD=8080 droplet/droplet.sh` and
 browse `localhost:8080`. The conf is `zig-metal-unikernel.conf`'s lines
 (`probe/config.zig`): an empty file serves on the public card with no
-volume; `card = private` wants `PRIVATE_FWD`. dog-park's
-`tools/metal_gate.mjs` instead boots its kernel straight under QEMU's
+volume; `card = private` wants `PRIVATE_FWD`. The dog-park repo's metal
+gate (retired 2026-11-16) instead booted its kernel straight under QEMU's
 microvm (`-kernel`), as `probe/run.sh` boots the probes.
 
 ### The checks, fastest to slowest

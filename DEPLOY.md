@@ -7,6 +7,11 @@ setup; the README says what the kernel is. dog-park's
 [`DEPLOY.md`](https://github.com/showell/dog-park/blob/main/DEPLOY.md) is
 Dog Park's own. **Running your own copies?** Start at the last section.
 
+**Dog Park's droplet is retired as of 2026-11-16, with the dog-park repo.**
+The game now lives in roc-apps and is served at roc.lynrummy.com/dog-park/,
+where dogpark.lynrummy.com redirects. What this doc says of Dog Park's
+droplet is how it was run.
+
 ## The machines
 
 | | role | address | how it is reached |
@@ -14,7 +19,7 @@ Dog Park's own. **Running your own copies?** Start at the last section.
 | **the dev box** | every build, gate and image; nothing serves from it publicly except a port the owner opens for an image download | its public address: `curl -s https://ifconfig.me` on it | ssh, as the owner |
 | **prod** | Caddy: HTTPS for every site, proxying over the private network; the watchdog script; the Observatory, as a Linux program watching Dog Park (observatory's README, "Where it runs") | public `162.243.1.123`, private `10.100.0.2` | `ssh 162.243.1.123` from the dev box; passwordless sudo |
 | **metal** (the droplet named `gopher-metal`) | lynrummy.com: this kernel, chat's data on a DigitalOcean volume (FAT32, serial in `droplet/volume-serial`) | private `10.100.0.4` only | through Caddy, or from prod over the private network; DigitalOcean's recovery console |
-| **dogpark** | dogpark.lynrummy.com: this kernel with Dog Park built in, one disk | private `10.100.0.3` only | the same |
+| **dogpark** | retired 2026-11-16 (the game is in roc-apps now); it was dogpark.lynrummy.com: this kernel with Dog Park built in, one disk | private `10.100.0.3` only | the same |
 
 **The droplets with no Linux have no ssh.** They listen only on port 80 of
 their private card. Their facts come from `/admin/host`, their insides
@@ -48,8 +53,8 @@ inline, as `$(cat <file>)`, and never echo, log or commit it.
 | `~/.gopher_api_key` | lynrummy.com, uid 1 (the owner), an admin key | `/admin/*` as a bearer token |
 | `~/.claude_gopher_api_key` | lynrummy.com, uid 3 (the agent's account) | the chat API as Claude |
 | `~/.shale_signing_key` | lynrummy.com's Shale signing key (private half; the site holds the public half) | `shale-sign … lynrummy.com` |
-| `~/.shale_signing_key.dogpark.lynrummy.com` | Dog Park's own Shale key, never lynrummy's; the image carries the public half | `shale-sign … dogpark.lynrummy.com` |
-| `~/.dogpark_admin_key` | Dog Park's admin key | Dog Park's `/admin/*` |
+| `~/.shale_signing_key.dogpark.lynrummy.com` | Dog Park's own Shale key, never lynrummy's; the image carries the public half (its droplet retired 2026-11-16) | `shale-sign … dogpark.lynrummy.com` |
+| `~/.dogpark_admin_key` | Dog Park's admin key (its droplet retired 2026-11-16) | Dog Park's `/admin/*` |
 
 The repos are pushed with the dev box's deploy key. Prod data leaves a
 machine only encrypted.
@@ -221,9 +226,9 @@ what it found.
 - **On lynrummy.com:** `sign` makes an atomic run (500 store reads,
   answered in the response); `background` makes a run stepped between
   requests (10,000 reads), read back with a `GET`.
-- **On Dog Park:** background only.
-- **The cookbook:** shale's `src/script/examples/` (lynrummy.com),
-  dog-park's `tools/shale/`.
+- **On Dog Park** (its droplet retired 2026-11-16): background only.
+- **The cookbook:** shale's `src/script/examples/` (lynrummy.com), and
+  until 2026-11-16 the retired dog-park repo's tools/shale/ folder.
 
 ```
 cd <a scratch folder> && cp <script>.shale .
@@ -235,7 +240,7 @@ curl -sS -H "Authorization: Bearer $(cat ~/.gopher_api_key)" https://lynrummy.co
 - **`shale-sign`** picks the key by the target name (lynrummy.com's,
   or `~/.shale_signing_key.<target>`).
 - **The request** is good for 10 minutes and runs once.
-- **For Dog Park**, the target is `dogpark.lynrummy.com` and
+- **For Dog Park**, until its droplet was retired on 2026-11-16, the target was `dogpark.lynrummy.com` and
   `SHALE_ADMIN_KEY` is `$(cat ~/.dogpark_admin_key)`.
 - **One background run at a time.** `shale-sign kill <target>` writes a
   `kill.<sequence>.req` that is sent the same way, and ends the run going.
@@ -250,14 +255,14 @@ curl -sS -H "Authorization: Bearer $(cat ~/.gopher_api_key)" https://lynrummy.co
 4. Changing the key is step 3 again; the old key's scripts are refused
    from then on.
 
-Dog Park's image carries its public key instead (dog-park `droplet/image.mjs`).
+Dog Park's image carried its public key instead (the retired dog-park repo's droplet/image.mjs).
 
 ## Prod's Caddy
 
 **Where the configuration lives:**
 - angry-gopher's `deploy/Caddyfile` (with the shared `access_log`
   snippet), and its `deploy/README.md` for installing it;
-- dog-park's `droplet/dogpark.lynrummy.com.caddy`;
+- the retired dog-park repo's dogpark.lynrummy.com.caddy, until 2026-11-16;
 - roc-apps' `<roc-apps>/ops/roc.lynrummy.com.caddy`.
 
 On prod they are installed under `/etc/caddy/`, with the site blocks in
@@ -272,15 +277,17 @@ and sshd: scanners are weather; a login from a stranger is an event.
 
 ## Dog Park
 
-dog-park's [`DEPLOY.md`](https://github.com/showell/dog-park/blob/main/DEPLOY.md)
+**Retired on 2026-11-16:** the droplet, and the repo it was built from; the
+game is in roc-apps now. dog-park's [`DEPLOY.md`](https://github.com/showell/dog-park/blob/main/DEPLOY.md)
 has the first deploy and "A new release". In short: `zig build metal-gate`
-last, then `droplet/image.mjs`, then the owner rebuilds the `dogpark`
+last, then droplet/image.mjs, then the owner rebuilds the `dogpark`
 droplet (Destroy → Restore base image). It has **one disk: a release starts every game over**
 (persistence waits until it is earned).
 
 ## The dev box's own servers
 
-- **Dog Park's dev server, :9103:**
+- **Dog Park's dev server, :9103** (retired 2026-11-16 with the dog-park
+  repo):
   - It runs a copy of the binary, `~/dogpark-test/play/dog-park-play`,
     with `data/`, `PID`, `log` and `config` beside it, and the checkout as
     its working directory, so it reads `solo/` on every request.
@@ -305,7 +312,7 @@ or Dog Park:
 
 - **Fork and check out side by side:** zig-metal-unikernel, zig-webbox,
   zig-coverage-sdk, shale, and angry-gopher (with chat-markdown and
-  chat-client, which its chat imports) or dog-park; metal-vmm too, for tiers
+  chat-client, which its chat imports) or dog-park (retired 2026-11-16); metal-vmm too, for tiers
   2-3 and the long tier. Zig 0.17. The README's "What you need" lists the
   rest (QEMU, mtools, dosfstools, KVM for metal-vmm).
 - **Try it locally first:** angry-gopher's `ops/start` (Linux, :9001), or
@@ -320,7 +327,7 @@ or Dog Park:
     printed by `droplet/new_volume.py`;
   - `droplet/trusted-proxy` (zig-metal-unikernel, and dog-park's own): your
     proxy's private address;
-  - Dog Park's domain, in dog-park `droplet/image.mjs`.
+  - Dog Park's domain, in dog-park's droplet/image.mjs.
 - **lynrummy.com's first deploy** differs from a release:
   1. Create a DigitalOcean volume, 16 GiB, in the region of your private
      network.
@@ -346,7 +353,7 @@ or Dog Park:
 - **Your keys, made fresh:**
   - an admin API key from `/admin`;
   - a Shale key pair (above, "A new site's key");
-  - for Dog Park, `droplet/image.mjs` makes the pair the first time.
+  - for Dog Park, dog-park's droplet/image.mjs makes the pair the first time.
 
   Never reuse someone else's keys; a site's key is its own.
 - **Your watchdog** (optional): angry-gopher's `deploy/watchdog.py` on

@@ -1,13 +1,16 @@
 -- **AN APPLICATION'S KERNEL, BOOTED UNDER QEMU TO TRY IT** (addAppKernel's
--- kernels: dog-park's dogpark.elf and dogpark-todo.elf, roc-webbox's
--- roc-todo.elf): a 64 MiB GPT disk, partition 1 FAT16 at sector 2048 (Dog
--- Park's metal gate's recipe), each `site` folder laid onto it, then QEMU as
--- a job that outlives this run, port 80 forwarded to 0.0.0.0:`port`. It is
--- ready when the serial says the kernel listens.
+-- kernels, such as roc-webbox's roc-todo.elf): a 64 MiB GPT disk, partition
+-- 1 FAT16 at sector 2048 (the retired bare-metal Dog Park's metal gate's
+-- recipe), each `site` folder laid onto it, then QEMU as a job that outlives
+-- this run, port 80 forwarded to 0.0.0.0:`port`. It is ready when the serial
+-- says the kernel listens.
 --
 --   shale repos:zig-metal-unikernel/tools/boot_app.shale \
---     elf=repos:dog-park/zig-out/bin/dogpark-todo.elf work=scratch:qemu/dogpark-todo \
---     port=9215 site=repos:dog-park/solo
+--     elf=repos:roc-webbox/zig-out/bin/roc-todo.elf work=scratch:qemu/roc-todo \
+--     port=9214
+--
+-- An application that serves files from its disk names their folders with
+-- `site=<folder>,<folder>`; roc-todo.elf needs none.
 --
 -- `work` keeps the disk: a second boot finds the first's data on it (delete
 -- `work`'s disk.img for a fresh one). The serial is `work`'s serial.log;
