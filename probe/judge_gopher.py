@@ -2622,7 +2622,7 @@ def secret_failures(elf, linux_bin, content, pristine, work, mnt, gopher_root, r
 
 
 # **A SIGNED SHALE SCRIPT, SIGNED HERE** (metal-vmm QUEUE 222): Python's
-# standard library has no Ed25519, so node signs, as Dog Park's gate does.
+# standard library has no Ed25519, so node signs.
 SIGN_JS = r"""
 const { generateKeyPairSync, sign, createPrivateKey } = require("node:crypto");
 const [what, a, b] = process.argv.slice(1);
@@ -2647,7 +2647,7 @@ def shale_node(*args, stdin=b""):
 
 def shale_background_failures(elf, gopher_root, work, report) -> int:
     """**A BACKGROUND SHALE RUN ON METAL, BESIDE REQUESTS** (metal-vmm QUEUE
-    222): lynrummy.com's route, as Dog Park's (tools/metal_gate.mjs). A
+    222): lynrummy.com's route. A
     signed `mode=background` script of 9,000 store reads (a slice each) is
     answered at once (202); while it runs, a second is refused (503 busy),
     the home page is answered, and GET /admin/script says it is running; the
