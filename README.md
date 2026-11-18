@@ -1,5 +1,30 @@
 # zig-metal-unikernel
 
+**Deprecated (2026-11-18): zig-metal-unikernel is no longer developed.**
+
+zig-metal-unikernel is a small Zig kernel that runs one web application on a
+cloud machine with no operating system: its own boot loader, virtio
+drivers, DHCP, ARP, TCP and FAT, with Zig's `std.http.Server` on top. It
+served lynrummy.com (angry-gopher) from September 2026, and Dog Park at
+dogpark.lynrummy.com until 2026-11-16. Its last deployed release is v47
+(2026-11-01), tagged `last-on-metal`, which lynrummy.com still runs as this
+is written; angry-gopher's README says where the site goes from here. There
+is no successor kernel.
+
+What we learned:
+- Linux as the reference made a kernel checkable: the same requests went to
+  angry-gopher's Linux build and to this kernel, over the same files, and
+  any difference was the kernel's bug.
+- Production was the easy case, a few daily users behind a TLS proxy. The
+  hard cases came from metal-vmm's sweeps and the simulators: a DHCP client
+  that never retransmitted, one refused write that left a volume that could
+  never mount again.
+- Refusing beats answering empty: the kernel will not serve when its data
+  volume is missing or another is attached, and a config it could not read
+  stops the boot rather than reading as the defaults.
+
+---
+
 A small operating-system kernel, written in Zig, that runs one web
 application on a cloud machine with nothing else under it. No Linux, no libc,
 no system calls: the kernel boots the machine, drives the network card and the
