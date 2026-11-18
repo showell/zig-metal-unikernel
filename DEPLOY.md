@@ -52,8 +52,6 @@ inline, as `$(cat <file>)`, and never echo, log or commit it.
 |---|---|---|
 | `~/.gopher_api_key` | lynrummy.com, uid 1 (the owner), an admin key | `/admin/*` as a bearer token |
 | `~/.claude_gopher_api_key` | lynrummy.com, uid 3 (the agent's account) | the chat API as Claude |
-| `~/.shale_signing_key` | lynrummy.com's Shale signing key (private half; the site holds the public half) | `shale-sign … lynrummy.com` |
-| `~/.shale_signing_key.dogpark.lynrummy.com` | Dog Park's own Shale key, never lynrummy's; the image carries the public half (its droplet retired 2026-11-16) | `shale-sign … dogpark.lynrummy.com` |
 | `~/.dogpark_admin_key` | Dog Park's admin key (its droplet retired 2026-11-16) | Dog Park's `/admin/*` |
 
 The repos are pushed with the dev box's deploy key. Prod data leaves a
@@ -141,8 +139,7 @@ zig-coverage-sdk's, which the verdicts also key on (`tools/verdicts.py`).
    new. **What serves is the tag**; master may be ahead of it.
 7. **Nothing in the README changes**: the tag is the record (README,
    "Where it stands").
-8. **After it serves:** a read-only Shale script or two (below), and
-   `ops/knocks` (angry-gopher) for the access logs.
+8. **After it serves:** `ops/knocks` (angry-gopher) for the access logs.
 
 ## The way back
 
@@ -219,43 +216,12 @@ build a volume image from it with
 `droplet/volume-serial` and the boot image change too. Restoring a tar onto
 metal has not been run end to end.
 
-## Shale scripts: looking inside a droplet
+## Shale scripts on a droplet
 
-A signed script sent to `/admin/script` runs on the droplet and prints
-what it found.
-- **On lynrummy.com:** `sign` makes an atomic run (500 store reads,
-  answered in the response); `background` makes a run stepped between
-  requests (10,000 reads), read back with a `GET`.
-- **On Dog Park** (its droplet retired 2026-11-16): background only.
-- **The cookbook:** shale's `src/script/examples/` (lynrummy.com), and
-  until 2026-11-16 the retired dog-park repo's tools/shale/ folder.
-
-```
-cd <a scratch folder> && cp <script>.shale .
-~/showell_repos/shale/zig-out/bin/shale-sign sign <script>.shale lynrummy.com   # or: background
-SHALE_ADMIN_KEY=$(cat ~/.gopher_api_key) sh -c '<the curl line it printed>'
-curl -sS -H "Authorization: Bearer $(cat ~/.gopher_api_key)" https://lynrummy.com/admin/script   # a background run's state and output
-```
-
-- **`shale-sign`** picks the key by the target name (lynrummy.com's,
-  or `~/.shale_signing_key.<target>`).
-- **The request** is good for 10 minutes and runs once.
-- **For Dog Park**, until its droplet was retired on 2026-11-16, the target was `dogpark.lynrummy.com` and
-  `SHALE_ADMIN_KEY` is `$(cat ~/.dogpark_admin_key)`.
-- **One background run at a time.** `shale-sign kill <target>` writes a
-  `kill.<sequence>.req` that is sent the same way, and ends the run going.
-- Every run is logged under `auth/shale/` on the site's disk.
-
-**A new site's key, once:**
-1. `shale-sign keygen [target]` makes the pair; the private key goes to
-   the file above and is never printed.
-2. `shale-sign pubkey [target]` prints `public_key = <64 hex>`.
-3. Sign in as the admin, open `/admin/script-key`, paste the hex, give
-   the target, type the admin password, Set.
-4. Changing the key is step 3 again; the old key's scripts are refused
-   from then on.
-
-Dog Park's image carried its public key instead (the retired dog-park repo's droplet/image.mjs).
+**Shale's signing tool is retired, so no script is signed or sent to a
+droplet.** The image still serves angry-gopher's `/admin/script` and
+`/admin/script-key`, which are slated for removal; with nothing to sign
+for them, they have no part in a release or a check.
 
 ## Prod's Caddy
 
